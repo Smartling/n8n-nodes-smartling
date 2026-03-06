@@ -9,8 +9,8 @@
   },
   "main": "dist/nodes/Smartling/Smartling.node.js",
   "scripts": {
-    "build": "tsc && npm run copy-icons",
-    "copy-icons": "cp nodes/Smartling/*.svg dist/nodes/Smartling/ 2>/dev/null || true",
+    "build": "tsc && npm run copy-assets",
+    "copy-assets": "cp nodes/Smartling/*.svg dist/nodes/Smartling/ && cp nodes/Smartling/*.node.json dist/nodes/Smartling/",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "lint": "eslint . --ext .ts",
