@@ -1,0 +1,11 @@
+{
+    "node": "n8n-nodes-smartling.smartlingTrigger",
+    "nodeVersion": "1.0",
+    "codexVersion": "1.0",
+    "categories": ["Productivity"],
+    "resources": {
+        "primaryDocumentation": [
+            { "url": "https://help.smartling.com/hc/en-us/articles/115003028634-API" }
+        ]
+    }
+}
