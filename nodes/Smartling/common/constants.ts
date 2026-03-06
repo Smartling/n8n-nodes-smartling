@@ -1,0 +1,15 @@
+export const API_URL = "https://api.smartling.com";
+export const DEFAULT_FILE_CONTENT_TYPE = "application/octet-stream";
+export const ZIP_CONTENT_TYPE = "application/zip";
+export const FILE_LANGUAGE_DETECTION_WAIT_TIME_MS = 500;
+export const URL_DETECTION_LIMIT_CHARACTERS = 1024;
+export const FILE_TYPE_DETECTION_MAX_BUFFER_SIZE = 20480;
+export const REMOTE_LOGGER_HOST = "n8n";
+export const REMOTE_LOGGER_CHANNEL = "n8n-integration";
+export const MAX_TEXT_LENGTH_FOR_TRANSLATION = 1024 * 64;
+export const MAX_TEXT_ITEMS_FOR_TRANSLATION = 1000;
+export const API_CLIENT_IDENTIFIER = "n8n";
+export const THROTTLED_REQUEST_DELAY_SECONDS = 120;
+export const REQUEST_ID_HEADER = "x-sl-requestid";
+export const DEFAULT_POLL_INTERVAL_SECONDS = 3;
+export const DEFAULT_POLL_TIMEOUT_SECONDS = 300;
