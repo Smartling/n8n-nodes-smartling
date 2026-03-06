@@ -3,14 +3,16 @@
   "version": "0.1.0",
   "description": "n8n community node for Smartling translation management",
   "license": "MIT",
-  "keywords": ["n8n-community-node-package"],
+  "keywords": [
+    "n8n-community-node-package"
+  ],
   "author": {
     "name": "Smartling"
   },
   "main": "dist/nodes/Smartling/Smartling.node.js",
   "scripts": {
     "build": "tsc && npm run copy-assets",
-    "copy-assets": "cp nodes/Smartling/*.svg dist/nodes/Smartling/ && cp nodes/Smartling/*.node.json dist/nodes/Smartling/",
+    "copy-assets": "cp nodes/Smartling/*.svg dist/nodes/Smartling/ && cp nodes/Smartling/*.node.json dist/nodes/Smartling/ && cp nodes/Smartling/*.svg dist/credentials/",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "lint": "eslint . --ext .ts",
@@ -19,7 +21,9 @@
     "test:coverage": "jest --coverage",
     "prepublishOnly": "npm run build"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
@@ -31,19 +35,19 @@
     ]
   },
   "dependencies": {
-    "smartling-api-sdk-nodejs": "^2.30.0",
     "@smartling/api-sdk-nodejs-internal": "^4.3.1",
     "jszip": "^3.10.1",
+    "smartling-api-sdk-nodejs": "^2.30.0",
     "zod": "^4.1.13"
   },
   "peerDependencies": {
     "n8n-workflow": "*"
   },
   "devDependencies": {
-    "n8n-workflow": "*",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.0.0",
     "jest": "^30.0.0",
+    "n8n-workflow": "*",
     "ts-jest": "^29.4.0",
     "typescript": "~5.9.3"
   }

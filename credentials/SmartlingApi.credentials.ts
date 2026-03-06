@@ -4,6 +4,7 @@ export class SmartlingApi implements ICredentialType {
     name = "smartlingApi";
     displayName = "Smartling API";
     documentationUrl = "https://help.smartling.com/hc/en-us/articles/115003028634-API";
+    icon = "file:smartling.svg" as const;
 
     properties: INodeProperties[] = [
         {
