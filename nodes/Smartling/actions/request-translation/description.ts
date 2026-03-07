@@ -198,7 +198,7 @@ export const requestTranslationDescription: INodeProperties[] = [
         displayName: "Binary Property",
         name: "binaryPropertyName",
         type: "string",
-        default: "data",
+        default: "={{ $('Binary data node').item.binary.data }}",
         required: true,
         description: "Name of the binary property containing the file to upload",
         displayOptions: {

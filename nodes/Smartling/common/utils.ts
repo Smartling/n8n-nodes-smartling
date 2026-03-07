@@ -1,3 +1,10 @@
+export const extractResourceLocatorValue = (raw: unknown): string => {
+    if (typeof raw === "object" && raw !== null && "__rl" in raw) {
+        return (raw as unknown as { value: string }).value;
+    }
+    return raw as string;
+};
+
 export const sleep = (ms: number) => (new Promise(resolve => {
     setTimeout(resolve, ms);
 }));

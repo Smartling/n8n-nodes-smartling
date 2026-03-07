@@ -19,8 +19,8 @@ const bindThis = (fn: Function, overrides: Record<string, unknown> = {}) =>
             userSecret: "test-secret",
         }),
         getCurrentNodeParameter: jest.fn().mockImplementation((name: string) => {
-            const params: Record<string, string> = {
-                projectUid: "proj-123",
+            const params: Record<string, unknown> = {
+                projectUid: { __rl: true, value: "proj-123", mode: "list", cachedResultName: "Test Project" },
                 accountUid: "acc-456",
                 ...overrides,
             };

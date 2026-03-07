@@ -3,6 +3,7 @@ import { createContext } from "../common/context";
 import type { SmartlingCredentials } from "../common/api";
 import { ListProjectsParameters } from "smartling-api-sdk-nodejs";
 import { WorkflowSearchParameters } from "@smartling/api-sdk-nodejs-internal";
+import { extractResourceLocatorValue } from "../common/utils";
 
 const getCredentials = async (self: ILoadOptionsFunctions): Promise<SmartlingCredentials> => {
     const creds = await self.getCredentials("smartlingApi");
@@ -34,7 +35,7 @@ export async function getMtLocales(this: ILoadOptionsFunctions): Promise<INodePr
 
 export async function getProjectLocales(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
     const credentials = await getCredentials(this);
-    const projectUid = this.getCurrentNodeParameter("projectUid") as string;
+    const projectUid = extractResourceLocatorValue(this.getCurrentNodeParameter("projectUid"));
     if (!projectUid) return [];
     const ctx = createContext(credentials, "getProjectLocales", getVersion());
     try {
@@ -53,7 +54,7 @@ export async function getProjectLocales(this: ILoadOptionsFunctions): Promise<IN
 
 export async function getProjectWorkflows(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
     const credentials = await getCredentials(this);
-    const projectUid = this.getCurrentNodeParameter("projectUid") as string;
+    const projectUid = extractResourceLocatorValue(this.getCurrentNodeParameter("projectUid"));
     if (!projectUid) return [];
     const ctx = createContext(credentials, "getProjectWorkflows", getVersion());
     try {
