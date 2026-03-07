@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 An n8n community node package (`n8n-nodes-smartling`) that integrates Smartling's translation management platform into n8n workflows. It provides two nodes:
 
-- **Smartling** (action node) — MT text/file translation, human translation requests, translated file downloads
+- **Smartling** (action node) — MT text/file translation via Machine Translation, human translation requests, translated file downloads
 - **SmartlingTrigger** (webhook node) — listens for 17 Smartling event types (file published, issues, jobs)
 
 ## Commands
@@ -20,6 +20,17 @@ npm run test:coverage
 npm run lint
 npm run lint:fix
 npm run clean        # rm -rf dist
+```
+
+## Running Locally with n8n
+
+```bash
+npm install n8n -g                # install n8n globally
+npm run build                     # build the node package
+npm link                          # register this package for linking
+mkdir -p ~/.n8n/custom && cd ~/.n8n/custom
+npm link n8n-nodes-smartling      # link the node into n8n's custom nodes
+n8n start                         # start n8n with the Smartling nodes available
 ```
 
 ## Architecture

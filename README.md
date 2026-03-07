@@ -10,10 +10,10 @@ Action node with the following operations:
 
 | Resource | Operation | Description |
 |----------|-----------|-------------|
-| Machine Translation | Translate Text | Translate plain text using Smartling MT |
-| Machine Translation | Translate File | Translate a file using Smartling MT (returns translated file as binary) |
-| Translation | Request Translation | Upload a file to a daily translation job for human translation |
-| File | Download | Download a published translated file |
+| Machine Translation | Translate Text via Machine Translation | Machine translate text using MT profile |
+| Machine Translation | Translate File via Machine Translation | Machine translate file using MT profile |
+| Translation | Request Translation | Upload a file to a daily job to request its translation |
+| File | Download Translated File | Download translated file for target locale |
 
 The node is also available as an **AI tool** (`usableAsTool: true`), so it can be used by AI agents in n8n.
 
@@ -65,6 +65,17 @@ npm run build        # compile TypeScript + copy assets
 npm run dev          # watch mode
 npm test             # run all tests
 npm run lint         # check code style
+```
+
+### Running locally with n8n
+
+```bash
+npm install n8n -g                # install n8n globally
+npm run build                     # build the node package
+npm link                          # register this package for linking
+mkdir -p ~/.n8n/custom && cd ~/.n8n/custom
+npm link n8n-nodes-smartling      # link the node into n8n's custom nodes
+n8n start                         # start n8n with the Smartling nodes available
 ```
 
 ## Known Limitations
