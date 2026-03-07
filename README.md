@@ -78,6 +78,17 @@ npm link n8n-nodes-smartling      # link the node into n8n's custom nodes
 n8n start                         # start n8n with the Smartling nodes available
 ```
 
+### Testing triggers locally with ngrok
+
+To test SmartlingTrigger webhooks from localhost, use [ngrok](https://ngrok.com/) to expose n8n's port:
+
+```bash
+ngrok http 5678
+export WEBHOOK_URL=https://<uuid>.ngrok-free.app && n8n start
+```
+
+This sets n8n's webhook base URL to the ngrok tunnel so Smartling can deliver webhook events to your local instance.
+
 ## Known Limitations
 
 These are upstream n8n platform issues that affect this node:

@@ -98,6 +98,17 @@ Tests use Jest with `ts-jest`. Test files are co-located with source as `*.spec.
 
 - **ResourceLocator search cache pollution** — When a user types a search query in a `resourceLocator` dropdown and changes it before the first request completes, n8n caches the stale results under the new query key, showing incorrect options. This is especially likely on initial dropdown open (no debounce). See [n8n#22123](https://github.com/n8n-io/n8n/issues/22123).
 
+## Testing Triggers Locally with ngrok
+
+To test SmartlingTrigger webhooks from localhost, use [ngrok](https://ngrok.com/) to expose n8n's port:
+
+```bash
+ngrok http 5678
+export WEBHOOK_URL=https://<uuid>.ngrok-free.app && n8n start
+```
+
+This sets n8n's webhook base URL to the ngrok tunnel so Smartling can deliver webhook events to your local instance.
+
 ## Build Notes
 
 The build copies `*.svg` and `*.node.json` (codex) files from `nodes/Smartling/` to `dist/` since TypeScript doesn't handle non-TS assets. The SVG is also copied to `dist/credentials/` for the credential icon.
