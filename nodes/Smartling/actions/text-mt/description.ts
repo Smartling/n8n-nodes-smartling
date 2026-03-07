@@ -6,7 +6,7 @@ export const textMtDescription: INodeProperties[] = [
         name: "sourceLocale",
         type: "options",
         typeOptions: {
-            loadOptionsMethod: "getMtLocales"
+            loadOptionsMethod: "getMtSourceLocales"
         },
         default: "",
         required: false,
@@ -23,7 +23,7 @@ export const textMtDescription: INodeProperties[] = [
         name: "targetLocale",
         type: "options",
         typeOptions: {
-            loadOptionsMethod: "getMtLocales"
+            loadOptionsMethod: "getMtTargetLocales"
         },
         default: "",
         required: true,

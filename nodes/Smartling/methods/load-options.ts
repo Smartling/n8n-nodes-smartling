@@ -15,22 +15,30 @@ const getCredentials = async (self: ILoadOptionsFunctions): Promise<SmartlingCre
 
 const getVersion = (): string => "0.1.0";
 
-export async function getMtLocales(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
-    const credentials = await getCredentials(this);
+async function fetchMtLocales(self: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+    const credentials = await getCredentials(self);
     const ctx = createContext(credentials, "getMtLocales", getVersion());
     try {
         const localesApi = ctx.getLocalesApi();
         const response = await localesApi.getLocales();
-        const locales = response.items
+        return response.items
             .filter((locale) => locale.mtSupported)
             .map((locale) => ({
                 name: `${locale.language.description} (${locale.localeId})`,
                 value: locale.localeId,
             }));
-        return [{ name: "Auto-Detect", value: "" }, ...locales];
     } finally {
         await ctx.logger.flush();
     }
+}
+
+export async function getMtSourceLocales(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+    const locales = await fetchMtLocales(this);
+    return [{ name: "Auto-Detect", value: "" }, ...locales];
+}
+
+export async function getMtTargetLocales(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+    return fetchMtLocales(this);
 }
 
 export async function getProjectLocales(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {

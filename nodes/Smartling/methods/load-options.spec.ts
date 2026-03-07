@@ -1,6 +1,6 @@
 jest.mock("../common/context");
 
-import { getMtLocales, getProjectLocales, getProjectWorkflows } from "./load-options";
+import { getMtSourceLocales, getMtTargetLocales, getProjectLocales, getProjectWorkflows } from "./load-options";
 import { createContext } from "../common/context";
 
 const mockCreateContext = createContext as jest.MockedFunction<typeof createContext>;
@@ -28,45 +28,66 @@ const bindThis = (fn: Function, overrides: Record<string, unknown> = {}) =>
         }),
     });
 
-describe("getMtLocales", () => {
+const mockLocalesApi = {
+    getLocales: jest.fn().mockResolvedValue({
+        items: [
+            {
+                localeId: "en-US",
+                mtSupported: true,
+                language: { description: "English (United States)" },
+            },
+            {
+                localeId: "fr-FR",
+                mtSupported: true,
+                language: { description: "French (France)" },
+            },
+            {
+                localeId: "xx-XX",
+                mtSupported: false,
+                language: { description: "Unsupported" },
+            },
+        ],
+    }),
+};
+
+const expectedMtLocales = [
+    { name: "English (United States) (en-US)", value: "en-US" },
+    { name: "French (France) (fr-FR)", value: "fr-FR" },
+];
+
+describe("getMtSourceLocales", () => {
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
-    it("should return filtered MT-supported locales", async () => {
-        const mockLocalesApi = {
-            getLocales: jest.fn().mockResolvedValue({
-                items: [
-                    {
-                        localeId: "en-US",
-                        mtSupported: true,
-                        language: { description: "English (United States)" },
-                    },
-                    {
-                        localeId: "fr-FR",
-                        mtSupported: true,
-                        language: { description: "French (France)" },
-                    },
-                    {
-                        localeId: "xx-XX",
-                        mtSupported: false,
-                        language: { description: "Unsupported" },
-                    },
-                ],
-            }),
-        };
-
+    it("should return Auto-Detect followed by MT-supported locales", async () => {
         mockCreateContext.mockReturnValue(
             createMockContext({ getLocalesApi: () => mockLocalesApi }) as any,
         );
 
-        const result = await bindThis(getMtLocales)();
+        const result = await bindThis(getMtSourceLocales)();
 
         expect(result).toEqual([
             { name: "Auto-Detect", value: "" },
-            { name: "English (United States) (en-US)", value: "en-US" },
-            { name: "French (France) (fr-FR)", value: "fr-FR" },
+            ...expectedMtLocales,
         ]);
+        expect(mockFlush).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("getMtTargetLocales", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it("should return MT-supported locales without Auto-Detect", async () => {
+        mockCreateContext.mockReturnValue(
+            createMockContext({ getLocalesApi: () => mockLocalesApi }) as any,
+        );
+
+        const result = await bindThis(getMtTargetLocales)();
+
+        expect(result).toEqual(expectedMtLocales);
         expect(mockFlush).toHaveBeenCalledTimes(1);
     });
 });

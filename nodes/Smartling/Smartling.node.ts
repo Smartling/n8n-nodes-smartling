@@ -24,7 +24,7 @@ import { executeDownloadTranslatedFile } from "./actions/download-translated-fil
 import { requestTranslationDescription } from "./actions/request-translation/description";
 import { executeRequestTranslation, type RequestTranslationParams } from "./actions/request-translation/execute";
 import { createContext } from "./common/context";
-import { getMtLocales, getProjectLocales, getProjectWorkflows } from "./methods/load-options";
+import { getMtSourceLocales, getMtTargetLocales, getProjectLocales, getProjectWorkflows } from "./methods/load-options";
 import { searchProjects } from "./methods/list-search";
 
 const NODE_VERSION = "0.1.0";
@@ -159,7 +159,8 @@ export class Smartling implements INodeType {
             },
         },
         loadOptions: {
-            getMtLocales,
+            getMtSourceLocales,
+            getMtTargetLocales,
             getProjectLocales,
             getProjectWorkflows,
         },

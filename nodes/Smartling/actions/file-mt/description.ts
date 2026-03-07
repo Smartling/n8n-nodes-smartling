@@ -64,7 +64,7 @@ export const fileMtDescription: INodeProperties[] = [
         name: "sourceLocale",
         type: "options",
         typeOptions: {
-            loadOptionsMethod: "getMtLocales"
+            loadOptionsMethod: "getMtSourceLocales"
         },
         default: "",
         required: false,
@@ -81,7 +81,7 @@ export const fileMtDescription: INodeProperties[] = [
         name: "targetLocales",
         type: "multiOptions",
         typeOptions: {
-            loadOptionsMethod: "getMtLocales"
+            loadOptionsMethod: "getMtTargetLocales"
         },
         default: [],
         required: true,
