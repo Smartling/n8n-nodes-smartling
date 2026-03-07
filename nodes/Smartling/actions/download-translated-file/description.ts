@@ -83,17 +83,9 @@ export const downloadTranslatedFileDescription: INodeProperties[] = [
                 value: "published"
             },
             {
-                name: "Approved",
-                value: "approved"
-            },
-            {
                 name: "Pending",
                 value: "pending"
             },
-            {
-                name: "In Context Review",
-                value: "contextMatchingInstrumented"
-            }
         ],
         default: "published",
         required: false,
