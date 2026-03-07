@@ -38,14 +38,6 @@ export class SmartlingTrigger implements INodeType {
         ],
         properties: [
             {
-                displayName: "Account UID",
-                name: "accountUid",
-                type: "string",
-                default: "",
-                required: true,
-                description: "The Smartling account UID",
-            },
-            {
                 displayName: "Event",
                 name: "event",
                 type: "options",

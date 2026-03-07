@@ -32,7 +32,6 @@ describe("webhook-lifecycle", () => {
         hookFunctions = createHookFunctionsMock();
         ctxMock = createContextMock();
         mockedCreateContext.mockReturnValue(ctxMock);
-        (hookFunctions.getNodeParameter as jest.Mock).mockReturnValue("test-account-uid");
     });
 
     describe("webhookCheckExists", () => {

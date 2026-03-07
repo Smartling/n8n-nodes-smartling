@@ -33,6 +33,9 @@ jest.mock("@smartling/api-sdk-nodejs-internal", () => ({
     SmartlingAccountsApi: class SmartlingAccountsApi {},
     SmartlingWorkflowsApi: class SmartlingWorkflowsApi {},
     SmartlingLogApi: class SmartlingLogApi {},
+    SearchAccountsParameters: jest.fn().mockImplementation(() => ({
+        setLimit: jest.fn().mockReturnThis()
+    })),
     CreateLogParameters: jest.fn().mockImplementation(() => ({
         export: jest.fn().mockReturnValue({}),
         addLogRecord: jest.fn()
@@ -110,5 +113,42 @@ describe("Context", () => {
     it("should create context via factory function", () => {
         const factoryCtx = createContext(credentials, "testAction", "1.0.0", { extra: "data" });
         expect(factoryCtx).toBeInstanceOf(Context);
+    });
+
+    it("should resolve account UID and cache the result", async () => {
+        const mockSearchAccounts = jest.fn().mockResolvedValue({
+            accounts: [{ accountUid: "acc-123", accountName: "Test Account" }]
+        });
+        mockBuild.mockImplementation((apiClass: any) => {
+            if (apiClass.name === "SmartlingAccountsApi") {
+                return { searchAccounts: mockSearchAccounts };
+            }
+            return { id: "other" };
+        });
+
+        const freshCtx = createContext(credentials, "testAction", "1.0.0");
+        const uid1 = await freshCtx.resolveAccountUid();
+        const uid2 = await freshCtx.resolveAccountUid();
+
+        expect(uid1).toBe("acc-123");
+        expect(uid2).toBe("acc-123");
+        expect(mockSearchAccounts).toHaveBeenCalledTimes(1);
+    });
+
+    it("should throw when no accounts found", async () => {
+        const mockSearchAccounts = jest.fn().mockResolvedValue({
+            accounts: []
+        });
+        mockBuild.mockImplementation((apiClass: any) => {
+            if (apiClass.name === "SmartlingAccountsApi") {
+                return { searchAccounts: mockSearchAccounts };
+            }
+            return { id: "other" };
+        });
+
+        const freshCtx = createContext(credentials, "testAction", "1.0.0");
+        await expect(freshCtx.resolveAccountUid()).rejects.toThrow(
+            "No Smartling account found for these credentials"
+        );
     });
 });

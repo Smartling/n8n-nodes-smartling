@@ -21,12 +21,9 @@ export async function searchProjects(
     paginationToken?: string,
 ): Promise<INodeListSearchResult> {
     const credentials = await getCredentials(this);
-    const accountUid = this.getCurrentNodeParameter("accountUid") as string;
-    if (!accountUid) {
-        return { results: [] };
-    }
     const ctx = createContext(credentials, "searchProjects", getVersion());
     try {
+        const accountUid = await ctx.resolveAccountUid();
         const projectsApi = ctx.getProjectsApi();
         const offset = paginationToken ? parseInt(paginationToken, 10) : 0;
         const params = new ListProjectsParameters()

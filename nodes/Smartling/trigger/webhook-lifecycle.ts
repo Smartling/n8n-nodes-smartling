@@ -19,7 +19,7 @@ export async function webhookCheckExists(
     const ctx = createContext(credentials, "webhook.checkExists", "0.1.0");
     try {
         const webhookUrl = this.getNodeWebhookUrl("default");
-        const accountUid = this.getNodeParameter("accountUid", "") as string;
+        const accountUid = await ctx.resolveAccountUid();
         const webhooksApi = ctx.getWebhooksApi();
 
         const response = await webhooksApi.getSubscriptions(accountUid);
@@ -50,7 +50,7 @@ export async function webhookCreate(
     const ctx = createContext(credentials, "webhook.create", "0.1.0");
     try {
         const webhookUrl = this.getNodeWebhookUrl("default") as string;
-        const accountUid = this.getNodeParameter("accountUid", "") as string;
+        const accountUid = await ctx.resolveAccountUid();
         const webhooksApi = ctx.getWebhooksApi();
 
         const params = new CreateSubscriptionParameters(
@@ -92,7 +92,7 @@ export async function webhookDelete(this: IHookFunctions): Promise<boolean> {
             return false;
         }
 
-        const accountUid = this.getNodeParameter("accountUid", "") as string;
+        const accountUid = await ctx.resolveAccountUid();
         const webhooksApi = ctx.getWebhooksApi();
 
         try {

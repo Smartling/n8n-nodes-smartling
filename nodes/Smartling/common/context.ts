@@ -16,7 +16,8 @@ import {
     SmartlingLanguageDetectionApi,
     SmartlingAccountsApi,
     SmartlingWorkflowsApi,
-    SmartlingLogApi
+    SmartlingLogApi,
+    SearchAccountsParameters
 } from "@smartling/api-sdk-nodejs-internal";
 import { SmartlingCredentials, createApiBuilder } from "./api";
 import { RemoteLogger } from "./logger";
@@ -30,6 +31,8 @@ export class Context {
     private readonly apiBuilder: SmartlingApiClientBuilder;
 
     private readonly apiMap = new Map<string, SmartlingBaseApi>();
+
+    private accountUidPromise: Promise<string> | undefined;
 
     constructor(
         credentials: SmartlingCredentials,
@@ -96,6 +99,22 @@ export class Context {
 
     public getJobBatchesApi(): SmartlingJobBatchesApi {
         return this.getApiInstance(SmartlingJobBatchesApi);
+    }
+
+    public async resolveAccountUid(): Promise<string> {
+        if (!this.accountUidPromise) {
+            this.accountUidPromise = (async () => {
+                const accountsApi = this.getAccountsApi();
+                const params = new SearchAccountsParameters().setLimit(1);
+                const result = await accountsApi.searchAccounts(params);
+                const accounts = (result as any).accounts;
+                if (!accounts?.length) {
+                    throw new Error("No Smartling account found for these credentials");
+                }
+                return accounts[0].accountUid as string;
+            })();
+        }
+        return this.accountUidPromise;
     }
 
     private getApiInstance<T extends SmartlingBaseApi>(apiClass: new (baseUrl: string, authApi: AccessTokenProvider, logger: any) => T) {

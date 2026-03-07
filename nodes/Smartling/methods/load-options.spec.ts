@@ -123,8 +123,13 @@ describe("getProjectWorkflows", () => {
             }),
         };
 
+        const mockResolveAccountUid = jest.fn().mockResolvedValue("acc-456");
+
         mockCreateContext.mockReturnValue(
-            createMockContext({ getWorkflowsApi: () => mockWorkflowsApi }) as any,
+            createMockContext({
+                getWorkflowsApi: () => mockWorkflowsApi,
+                resolveAccountUid: mockResolveAccountUid,
+            }) as any,
         );
 
         const result = await bindThis(getProjectWorkflows)();
@@ -133,6 +138,7 @@ describe("getProjectWorkflows", () => {
             { name: "Translation", value: "wf-1" },
             { name: "Review", value: "wf-2" },
         ]);
+        expect(mockResolveAccountUid).toHaveBeenCalled();
         expect(mockWorkflowsApi.searchWorkflows).toHaveBeenCalledWith(
             "acc-456",
             expect.anything(),
@@ -140,15 +146,8 @@ describe("getProjectWorkflows", () => {
         expect(mockFlush).toHaveBeenCalledTimes(1);
     });
 
-    it("should return empty array when no accountUid", async () => {
-        const result = await bindThis(getProjectWorkflows, { accountUid: "", projectUid: "proj-123" })();
-
-        expect(result).toEqual([]);
-        expect(mockCreateContext).not.toHaveBeenCalled();
-    });
-
     it("should return empty array when no projectUid", async () => {
-        const result = await bindThis(getProjectWorkflows, { projectUid: "", accountUid: "acc-456" })();
+        const result = await bindThis(getProjectWorkflows, { projectUid: "" })();
 
         expect(result).toEqual([]);
         expect(mockCreateContext).not.toHaveBeenCalled();

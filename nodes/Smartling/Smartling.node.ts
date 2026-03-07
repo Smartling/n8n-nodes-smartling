@@ -119,20 +119,6 @@ export class Smartling implements INodeType {
                 ],
                 default: "download",
             },
-            // Account UID - needed for MT operations and request translation
-            {
-                displayName: "Account UID",
-                name: "accountUid",
-                type: "string",
-                default: "",
-                required: true,
-                description: "The Smartling account UID",
-                displayOptions: {
-                    show: {
-                        resource: ["machineTranslation", "translation"],
-                    },
-                },
-            },
             // All field definitions from each action
             ...textMtDescription,
             ...fileMtDescription,
@@ -157,21 +143,10 @@ export class Smartling implements INodeType {
                         "credentialTest",
                         NODE_VERSION,
                     );
-                    const accountsApi = ctx.getAccountsApi();
-                    const { SearchAccountsParameters } = await import(
-                        "@smartling/api-sdk-nodejs-internal"
-                    );
-                    const params = new SearchAccountsParameters().setLimit(1);
-                    const result = await accountsApi.searchAccounts(params);
-                    if (!(result as any).accounts?.length) {
-                        return {
-                            status: "Error",
-                            message: "No account found for these credentials",
-                        };
-                    }
+                    await ctx.resolveAccountUid();
                     return {
                         status: "OK",
-                        message: `Connected to ${(result as any).accounts[0].accountName}`,
+                        message: "Successfully connected to Smartling",
                     };
                 } catch (error) {
                     return {
@@ -211,7 +186,7 @@ export class Smartling implements INodeType {
 
                 try {
                     if (resource === "machineTranslation" && operation === "translateText") {
-                        const accountUid = this.getNodeParameter("accountUid", i) as string;
+                        const accountUid = await ctx.resolveAccountUid();
                         const sourceLocale = this.getNodeParameter("sourceLocale", i) as string;
                         const targetLocale = this.getNodeParameter("targetLocale", i) as string;
                         const sourceText = this.getNodeParameter("sourceText", i) as string;
@@ -226,7 +201,7 @@ export class Smartling implements INodeType {
 
                         returnData.push({ json: result as IDataObject, pairedItem: i });
                     } else if (resource === "machineTranslation" && operation === "translateFile") {
-                        const accountUid = this.getNodeParameter("accountUid", i) as string;
+                        const accountUid = await ctx.resolveAccountUid();
                         const binaryPropertyName = this.getNodeParameter(
                             "binaryPropertyName",
                             i,
@@ -308,7 +283,7 @@ export class Smartling implements INodeType {
                             pairedItem: i,
                         });
                     } else if (resource === "translation" && operation === "requestTranslation") {
-                        const accountUid = this.getNodeParameter("accountUid", i) as string;
+                        const accountUid = await ctx.resolveAccountUid();
                         const projectUidParam = this.getNodeParameter("projectUid", i) as {
                             value: string;
                         };

@@ -105,6 +105,7 @@ export const createContextMock = (overrides?: Partial<Context>): Context => {
         getWorkflowsApi: () => workflowsApiMock,
         getJobBatchesApi: () => jobBatchesApiMock,
         getJobsApi: () => jobsApiMock,
+        resolveAccountUid: jest.fn().mockResolvedValue("test-account-uid"),
         ...overrides
     } as unknown as Context;
 };

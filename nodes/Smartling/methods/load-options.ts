@@ -52,11 +52,11 @@ export async function getProjectLocales(this: ILoadOptionsFunctions): Promise<IN
 
 export async function getProjectWorkflows(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
     const credentials = await getCredentials(this);
-    const accountUid = this.getCurrentNodeParameter("accountUid") as string;
     const projectUid = this.getCurrentNodeParameter("projectUid") as string;
-    if (!accountUid || !projectUid) return [];
+    if (!projectUid) return [];
     const ctx = createContext(credentials, "getProjectWorkflows", getVersion());
     try {
+        const accountUid = await ctx.resolveAccountUid();
         const workflowsApi = ctx.getWorkflowsApi();
         const params = new WorkflowSearchParameters().setProjectId(projectUid);
         const response = await workflowsApi.searchWorkflows(accountUid, params);

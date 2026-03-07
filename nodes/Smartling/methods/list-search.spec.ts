@@ -12,19 +12,13 @@ const createMockContext = (apiOverrides: Record<string, unknown> = {}) => ({
     ...apiOverrides,
 });
 
-const bindThis = (fn: Function, overrides: Record<string, unknown> = {}) =>
+const bindThis = (fn: Function) =>
     fn.bind({
         getCredentials: jest.fn().mockResolvedValue({
             userIdentifier: "test-user",
             userSecret: "test-secret",
         }),
-        getCurrentNodeParameter: jest.fn().mockImplementation((name: string) => {
-            const params: Record<string, string> = {
-                accountUid: "acc-456",
-                ...overrides,
-            };
-            return params[name];
-        }),
+        getCurrentNodeParameter: jest.fn(),
     });
 
 describe("searchProjects", () => {
@@ -43,7 +37,10 @@ describe("searchProjects", () => {
         };
 
         mockCreateContext.mockReturnValue(
-            createMockContext({ getProjectsApi: () => mockProjectsApi }) as any,
+            createMockContext({
+                getProjectsApi: () => mockProjectsApi,
+                resolveAccountUid: jest.fn().mockResolvedValue("acc-456"),
+            }) as any,
         );
 
         const result = await bindThis(searchProjects)();
@@ -68,7 +65,10 @@ describe("searchProjects", () => {
         };
 
         mockCreateContext.mockReturnValue(
-            createMockContext({ getProjectsApi: () => mockProjectsApi }) as any,
+            createMockContext({
+                getProjectsApi: () => mockProjectsApi,
+                resolveAccountUid: jest.fn().mockResolvedValue("acc-456"),
+            }) as any,
         );
 
         const result = await bindThis(searchProjects)("Filtered");
@@ -93,7 +93,10 @@ describe("searchProjects", () => {
         };
 
         mockCreateContext.mockReturnValue(
-            createMockContext({ getProjectsApi: () => mockProjectsApi }) as any,
+            createMockContext({
+                getProjectsApi: () => mockProjectsApi,
+                resolveAccountUid: jest.fn().mockResolvedValue("acc-456"),
+            }) as any,
         );
 
         const result = await bindThis(searchProjects)(undefined, "0");
@@ -110,7 +113,10 @@ describe("searchProjects", () => {
         };
 
         mockCreateContext.mockReturnValue(
-            createMockContext({ getProjectsApi: () => mockProjectsApi }) as any,
+            createMockContext({
+                getProjectsApi: () => mockProjectsApi,
+                resolveAccountUid: jest.fn().mockResolvedValue("acc-456"),
+            }) as any,
         );
 
         const result = await bindThis(searchProjects)();
@@ -118,10 +124,4 @@ describe("searchProjects", () => {
         expect(result.paginationToken).toBeUndefined();
     });
 
-    it("should return empty results when no accountUid", async () => {
-        const result = await bindThis(searchProjects, { accountUid: "" })();
-
-        expect(result).toEqual({ results: [] });
-        expect(mockCreateContext).not.toHaveBeenCalled();
-    });
 });
