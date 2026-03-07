@@ -20,12 +20,13 @@ export async function getMtLocales(this: ILoadOptionsFunctions): Promise<INodePr
     try {
         const localesApi = ctx.getLocalesApi();
         const response = await localesApi.getLocales();
-        return response.items
+        const locales = response.items
             .filter((locale) => locale.mtSupported)
             .map((locale) => ({
                 name: `${locale.language.description} (${locale.localeId})`,
                 value: locale.localeId,
             }));
+        return [{ name: "Auto-Detect", value: "" }, ...locales];
     } finally {
         await ctx.logger.flush();
     }

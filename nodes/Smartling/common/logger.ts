@@ -60,6 +60,14 @@ export class RemoteLogger {
         this.commonContext.requestId = requestId;
     }
 
+    public setContextValue(key: string, value: unknown) {
+        this.commonContext[key] = value;
+    }
+
+    public getContextValue(key: string): unknown {
+        return this.commonContext[key];
+    }
+
     private addLogEntry(level: LogLevel, message: string, context?: LogContext) {
         const finalContext = {
             ...this.commonContext,

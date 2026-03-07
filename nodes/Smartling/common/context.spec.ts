@@ -133,6 +133,7 @@ describe("Context", () => {
         expect(uid1).toBe("acc-123");
         expect(uid2).toBe("acc-123");
         expect(mockSearchAccounts).toHaveBeenCalledTimes(1);
+        expect(freshCtx.logger.getContextValue("accountUid")).toBe("acc-123");
     });
 
     it("should throw when no accounts found", async () => {

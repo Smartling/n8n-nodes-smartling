@@ -110,4 +110,10 @@ describe("RemoteLogger", () => {
 
         expect(logger.getRequestId()).toBe(newRequestId);
     });
+
+    it("should support setContextValue and getContextValue", () => {
+        logger.setContextValue("accountUid", "acc-123");
+
+        expect(logger.getContextValue("accountUid")).toBe("acc-123");
+    });
 });

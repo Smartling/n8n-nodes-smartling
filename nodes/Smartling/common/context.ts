@@ -111,7 +111,9 @@ export class Context {
                 if (!accounts?.length) {
                     throw new Error("No Smartling account found for these credentials");
                 }
-                return accounts[0].accountUid as string;
+                const accountUid = accounts[0].accountUid as string;
+                this.logger.setContextValue("accountUid", accountUid);
+                return accountUid;
             })();
         }
         return this.accountUidPromise;

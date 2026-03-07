@@ -10,7 +10,7 @@ export const textMtDescription: INodeProperties[] = [
         },
         default: "",
         required: false,
-        description: "The language code of the text to be translated (e.g., \"en\" for English). Leave blank for auto-detection.",
+        description: "The language code of the text to be translated (e.g., \"en\" for English). Select \"Auto-Detect\" to detect the source language automatically.",
         displayOptions: {
             show: {
                 resource: ["machineTranslation"],

@@ -63,6 +63,7 @@ describe("getMtLocales", () => {
         const result = await bindThis(getMtLocales)();
 
         expect(result).toEqual([
+            { name: "Auto-Detect", value: "" },
             { name: "English (United States) (en-US)", value: "en-US" },
             { name: "French (France) (fr-FR)", value: "fr-FR" },
         ]);
