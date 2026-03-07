@@ -74,16 +74,16 @@ export const downloadTranslatedFileDescription: INodeProperties[] = [
         }
     },
     {
-        displayName: "Retrieval Type",
+        displayName: "Download Mode",
         name: "retrievalType",
         type: "options",
         options: [
             {
-                name: "Published",
+                name: "Download Published Translations",
                 value: "published"
             },
             {
-                name: "Pending",
+                name: "Download All Saved Translations",
                 value: "pending"
             },
         ],

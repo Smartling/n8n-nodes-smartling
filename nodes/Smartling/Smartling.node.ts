@@ -73,16 +73,16 @@ export class Smartling implements INodeType {
                 displayOptions: { show: { resource: ["machineTranslation"] } },
                 options: [
                     {
-                        name: "Translate Text",
+                        name: "Translate Text via Machine Translation",
                         value: "translateText",
-                        action: "Translate text using MT",
-                        description: "Translate text using machine translation",
+                        action: "Translate text via machine translation",
+                        description: "Machine translate text using MT profile",
                     },
                     {
-                        name: "Translate File",
+                        name: "Translate File via Machine Translation",
                         value: "translateFile",
-                        action: "Translate file using MT",
-                        description: "Translate a file using machine translation",
+                        action: "Translate file via machine translation",
+                        description: "Machine translate file using MT profile",
                     },
                 ],
                 default: "translateText",
@@ -98,8 +98,8 @@ export class Smartling implements INodeType {
                     {
                         name: "Request Translation",
                         value: "requestTranslation",
-                        action: "Request file translation",
-                        description: "Upload file to a daily translation job",
+                        action: "Request translation",
+                        description: "Upload a file to a daily job to request its translation",
                     },
                 ],
                 default: "requestTranslation",
@@ -113,10 +113,10 @@ export class Smartling implements INodeType {
                 displayOptions: { show: { resource: ["file"] } },
                 options: [
                     {
-                        name: "Download",
+                        name: "Download Translated File",
                         value: "download",
                         action: "Download translated file",
-                        description: "Download a published translated file",
+                        description: "Download translated file for target locale",
                     },
                 ],
                 default: "download",

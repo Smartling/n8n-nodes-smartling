@@ -36,7 +36,7 @@ export const textMtDescription: INodeProperties[] = [
         }
     },
     {
-        displayName: "Source Text",
+        displayName: "Text to Translate",
         name: "sourceText",
         type: "string",
         typeOptions: {
