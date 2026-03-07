@@ -81,6 +81,12 @@ The main `Smartling.node.ts` routes `resource`/`operation` combos to the appropr
 
 Tests use Jest with `ts-jest`. Test files are co-located with source as `*.spec.ts`. Tests mock Smartling SDK classes — see existing specs for mock patterns. The `tsconfig.json` excludes `*.spec.ts` from compilation output.
 
+## Known n8n Limitations
+
+- **`loadOptionsDependsOn` does not work with `resourceLocator` fields** — n8n's `loadOptions` mechanism does not re-trigger when a dependency field uses the `resourceLocator` type. This means dropdowns that depend on the project picker (a `listSearch`/`resourceLocator` field) won't automatically refresh when the project selection changes. Workaround: users must manually re-open the dropdown. See [n8n community discussion](https://community.n8n.io/t/how-to-re-trigger-loadoptions/190792).
+
+- **ResourceLocator search cache pollution** — When a user types a search query in a `resourceLocator` dropdown and changes it before the first request completes, n8n caches the stale results under the new query key, showing incorrect options. This is especially likely on initial dropdown open (no debounce). See [n8n#22123](https://github.com/n8n-io/n8n/issues/22123).
+
 ## Build Notes
 
 The build copies `*.svg` and `*.node.json` (codex) files from `nodes/Smartling/` to `dist/` since TypeScript doesn't handle non-TS assets. The SVG is also copied to `dist/credentials/` for the credential icon.

@@ -67,6 +67,14 @@ npm test             # run all tests
 npm run lint         # check code style
 ```
 
+## Known Limitations
+
+These are upstream n8n platform issues that affect this node:
+
+- **Dropdowns may not refresh when changing projects** — n8n's `loadOptions` does not re-trigger when the dependency is a `resourceLocator` field ([community discussion](https://community.n8n.io/t/how-to-re-trigger-loadoptions/190792)). If a dropdown (e.g. target locales, workflows) shows stale options after switching projects, close and re-open the dropdown to refresh.
+
+- **Project search may show incorrect results** — Changing the search query in the project picker before the previous search completes can cause stale results to appear ([n8n#22123](https://github.com/n8n-io/n8n/issues/22123)). If results look wrong, clear the search field and try again.
+
 ## License
 
 [MIT](LICENSE)
