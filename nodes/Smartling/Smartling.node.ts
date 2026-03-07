@@ -13,6 +13,8 @@ import type {
 } from "n8n-workflow";
 import { NodeConnectionTypes, NodeOperationError } from "n8n-workflow";
 
+import { wrapAndLogError } from "./common/errors";
+
 import { textMtDescription } from "./actions/text-mt/description";
 import { executeTextMt } from "./actions/text-mt/execute";
 import { fileMtDescription } from "./actions/file-mt/description";
@@ -352,6 +354,13 @@ export class Smartling implements INodeType {
                             { itemIndex: i },
                         );
                     }
+                } catch (error) {
+                    throw wrapAndLogError(
+                        ctx,
+                        this.getNode(),
+                        error,
+                        `Smartling ${resource}.${operation} failed`,
+                    );
                 } finally {
                     await ctx.logger.flush();
                 }
