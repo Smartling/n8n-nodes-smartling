@@ -1,0 +1,103 @@
+{
+  "name": "[Test] Smartling - File MT",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Setup\n1. Assign your **Smartling API** credential to the Smartling node\n2. Edit the **Config** node to set:\n   - `testFilePath` — absolute path to a file (e.g. /path/to/sample.json)\n   - `targetLocales` — comma-separated locales (default: fr-FR, de-DE, es-ES)\n3. Click **Test Workflow** to run\n\nNote: MT locales are from the global MT list, not project-specific."
+      },
+      "id": "note-1",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-20, -200]
+    },
+    {
+      "parameters": {},
+      "id": "trigger-1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-testFilePath",
+              "name": "testFilePath",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "cfg-targetLocales",
+              "name": "targetLocales",
+              "value": "fr-FR, de-DE, es-ES",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config-1",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $('Config').item.json.testFilePath }}"
+      },
+      "id": "read-file-1",
+      "name": "Read Binary File",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "resource": "machineTranslation",
+        "operation": "translateFile",
+        "binaryPropertyName": "data",
+        "fileType": "",
+        "sourceLocale": "",
+        "targetLocales": "={{ $('Config').item.json.targetLocales.split(',').map(s => s.trim()) }}",
+        "timeout": 300,
+        "pollInterval": 3
+      },
+      "id": "smartling-1",
+      "name": "Smartling",
+      "type": "n8n-nodes-smartling.smartling",
+      "typeVersion": 1,
+      "position": [660, 0],
+      "credentials": {
+        "smartlingApi": {
+          "id": "",
+          "name": "Smartling API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "Config", "type": "main", "index": 0 }]]
+    },
+    "Config": {
+      "main": [[{ "node": "Read Binary File", "type": "main", "index": 0 }]]
+    },
+    "Read Binary File": {
+      "main": [[{ "node": "Smartling", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "active": false
+}

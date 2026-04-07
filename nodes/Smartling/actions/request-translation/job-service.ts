@@ -162,10 +162,17 @@ export const addFileToJob = async (
             initialDelay: BATCH_STATUS_POLLING_INITIAL_DELAY,
             delayBetweenAttempts: BATCH_STATUS_POLLING_INTERVAL,
             maxDuration,
-            exitCondition: (data) => data.files[0].status !== BatchItemStatus.ATTACHING && data.files[0].status !== ("UPLOADING" as any),
+            exitCondition: (data) => {
+                if (!data.files?.length) return true;
+                return data.files[0].status !== BatchItemStatus.ATTACHING && data.files[0].status !== ("UPLOADING" as any);
+            },
             returnLastOnTimeout: true
         }
     );
+
+    if (!result.files?.length) {
+        throw new Error("Batch status returned no files.");
+    }
 
     if (
         result.files[0].status === BatchItemStatus.ATTACH_FAILED

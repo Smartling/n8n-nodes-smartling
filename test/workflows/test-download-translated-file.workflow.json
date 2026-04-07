@@ -1,0 +1,111 @@
+{
+  "name": "[Test] Smartling - Download Translated File",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Setup\n1. Assign your **Smartling API** credential to the Smartling node\n2. Edit the **Config** node to set:\n   - `projectUid` — your Smartling project UID\n   - `fileUri` — URI of a file previously uploaded to the project\n   - `targetLocale` — single locale to download (default: fr-FR)\n   - `retrievalType` — pending (all saved) or published (approved only)\n   - `includeOriginalStrings` — true/false\n3. Click **Test Workflow** to run\n\nNote: fileUri must reference a file already uploaded to the project."
+      },
+      "id": "note-1",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-20, -200]
+    },
+    {
+      "parameters": {},
+      "id": "trigger-1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-projectUid",
+              "name": "projectUid",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "cfg-fileUri",
+              "name": "fileUri",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "cfg-targetLocale",
+              "name": "targetLocale",
+              "value": "fr-FR",
+              "type": "string"
+            },
+            {
+              "id": "cfg-retrievalType",
+              "name": "retrievalType",
+              "value": "pending",
+              "type": "string"
+            },
+            {
+              "id": "cfg-includeOriginalStrings",
+              "name": "includeOriginalStrings",
+              "value": "false",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config-1",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "projectUid": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Config').item.json.projectUid }}"
+        },
+        "fileUri": "={{ $('Config').item.json.fileUri }}",
+        "targetLocale": "={{ $('Config').item.json.targetLocale }}",
+        "retrievalType": "={{ $('Config').item.json.retrievalType }}",
+        "includeOriginalStrings": "={{ String($('Config').item.json.includeOriginalStrings).toLowerCase() === 'true' }}"
+      },
+      "id": "smartling-1",
+      "name": "Smartling",
+      "type": "n8n-nodes-smartling.smartling",
+      "typeVersion": 1,
+      "position": [440, 0],
+      "credentials": {
+        "smartlingApi": {
+          "id": "",
+          "name": "Smartling API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "Config", "type": "main", "index": 0 }]]
+    },
+    "Config": {
+      "main": [[{ "node": "Smartling", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "active": false
+}

@@ -15,5 +15,6 @@ export enum EventTypes {
     TRANSLATION_JOB_CREATED = "translationJob.created",
     TRANSLATION_JOB_UPDATED = "translationJob.updated",
     TRANSLATION_JOB_COMPLETED = "translationJob.completed",
-    TRANSLATION_JOB_CANCELED = "translationJob.canceled"
+    TRANSLATION_JOB_CANCELED = "translationJob.canceled",
+    INTEGRATIONS_PLATFORM_ASSET_EXPORTED = "integrations.platform.asset.exported"
 }

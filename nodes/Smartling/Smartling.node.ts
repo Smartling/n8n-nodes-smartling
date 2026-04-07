@@ -24,6 +24,7 @@ import { executeDownloadTranslatedFile } from "./actions/download-translated-fil
 import { requestTranslationDescription } from "./actions/request-translation/description";
 import { executeRequestTranslation, type RequestTranslationParams } from "./actions/request-translation/execute";
 import { createContext } from "./common/context";
+import { extractResourceLocatorValue } from "./common/utils";
 import { getMtSourceLocales, getMtTargetLocales, getProjectLocales, getProjectWorkflows } from "./methods/load-options";
 import { searchProjects } from "./methods/list-search";
 
@@ -249,11 +250,9 @@ export class Smartling implements INodeType {
                             pairedItem: i,
                         });
                     } else if (resource === "file" && operation === "download") {
-                        const projectUidParam = this.getNodeParameter("projectUid", i) as {
-                            value: string;
-                        };
-                        const projectUid =
-                            projectUidParam.value || (projectUidParam as unknown as string);
+                        const projectUid = extractResourceLocatorValue(
+                            this.getNodeParameter("projectUid", i),
+                        );
                         const fileUri = this.getNodeParameter("fileUri", i) as string;
                         const targetLocale = this.getNodeParameter("targetLocale", i) as string;
                         const retrievalType = this.getNodeParameter(
@@ -287,11 +286,9 @@ export class Smartling implements INodeType {
                         });
                     } else if (resource === "translation" && operation === "requestTranslation") {
                         const accountUid = await ctx.resolveAccountUid();
-                        const projectUidParam = this.getNodeParameter("projectUid", i) as {
-                            value: string;
-                        };
-                        const projectUid =
-                            projectUidParam.value || (projectUidParam as unknown as string);
+                        const projectUid = extractResourceLocatorValue(
+                            this.getNodeParameter("projectUid", i),
+                        );
                         const dailyJobType = this.getNodeParameter("dailyJobType", i) as string;
                         const dailyJobNamePrefix = this.getNodeParameter(
                             "dailyJobNamePrefix",

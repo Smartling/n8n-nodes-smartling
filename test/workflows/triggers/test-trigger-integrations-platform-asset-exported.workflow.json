@@ -1,0 +1,116 @@
+{
+  "name": "[Test] Smartling Trigger - Asset Exported",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Asset Exported Trigger\n\n**Category:** Integrations Platform\n**Event:** `integrations.platform.asset.exported`\n\n### Payload Fields\n- `account.accountUid` / `account.accountName`\n- `project.projectUid` / `project.projectName` / `project.projectTypeCode`\n- `project.sourceLocale` / `project.targetLocales[]`\n- `asset.integrationId` — connector type (e.g. shopify)\n- `asset.fileUri` — file URI in Smartling\n- `asset.assetUid` — internal asset identifier\n- `asset.externalAssetId` — external CMS identifier (nullable)\n- `asset.targetLocales[]` — locales exported\n\n### Setup\n1. Assign your **Smartling API** credential\n2. Optionally select project(s) to filter\n3. **Activate** the workflow to register the webhook\n4. Export an asset from a connector project to trigger\n\nNote: Webhook triggers require activation. Use ngrok for local testing."
+      },
+      "id": "note-1",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-20, -220]
+    },
+    {
+      "parameters": {
+        "event": "integrations.platform.asset.exported",
+        "projectUids": []
+      },
+      "id": "trigger-1",
+      "name": "Smartling Trigger",
+      "type": "n8n-nodes-smartling.smartlingTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "webhookId": "",
+      "credentials": {
+        "smartlingApi": {
+          "id": "",
+          "name": "Smartling API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "out-event",
+              "name": "eventType",
+              "value": "={{ $json.eventType }}",
+              "type": "string"
+            },
+            {
+              "id": "out-projectUid",
+              "name": "projectUid",
+              "value": "={{ $json.project?.projectUid }}",
+              "type": "string"
+            },
+            {
+              "id": "out-projectType",
+              "name": "projectTypeCode",
+              "value": "={{ $json.project?.projectTypeCode }}",
+              "type": "string"
+            },
+            {
+              "id": "out-integrationId",
+              "name": "integrationId",
+              "value": "={{ $json.asset?.integrationId }}",
+              "type": "string"
+            },
+            {
+              "id": "out-fileUri",
+              "name": "fileUri",
+              "value": "={{ $json.asset?.fileUri }}",
+              "type": "string"
+            },
+            {
+              "id": "out-assetUid",
+              "name": "assetUid",
+              "value": "={{ $json.asset?.assetUid }}",
+              "type": "string"
+            },
+            {
+              "id": "out-externalAssetId",
+              "name": "externalAssetId",
+              "value": "={{ $json.asset?.externalAssetId }}",
+              "type": "string"
+            },
+            {
+              "id": "out-targetLocales",
+              "name": "exportedLocales",
+              "value": "={{ $json.asset?.targetLocales?.map(l => l.localeId).join(', ') }}",
+              "type": "string"
+            },
+            {
+              "id": "out-timestamp",
+              "name": "receivedAt",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "output-1",
+      "name": "Log Event",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0]
+    }
+  ],
+  "connections": {
+    "Smartling Trigger": {
+      "main": [[{ "node": "Log Event", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "active": false
+}

@@ -139,8 +139,16 @@ export const WEBHOOK_TRANSLATION_JOB_FILE_PAYLOAD = {
 
 export const WEBHOOK_TRANSLATION_JOB_TARGET_LOCALE_PAYLOAD = {
     localeId: "ua-UK",
-    description: "French (France) [ua-UK]",
+    description: "Ukrainian [ua-UK]",
     status: "completed"
+};
+
+export const WEBHOOK_ASSET_EXPORTED_PAYLOAD = {
+    integrationId: "shopify",
+    fileUri: "sample-asset-PRODUCT-123456.json",
+    assetUid: "PRODUCT-123456",
+    externalAssetId: null as string | null,
+    targetLocales: [WEBHOOK_LOCALE_PAYLOAD]
 };
 
 export const WEBHOOK_TRANSLATION_JOB_PAYLOAD = {

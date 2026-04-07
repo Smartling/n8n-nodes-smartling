@@ -1,0 +1,97 @@
+{
+  "name": "[Test] Smartling Trigger - Translation Job Updated",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Translation Job Updated Trigger\n\n**Category:** Translation Job\n**Event:** `translationJob.updated`\n\n### Setup\n1. Assign your **Smartling API** credential\n2. Optionally select project(s) to filter\n3. **Activate** the workflow to register the webhook\n4. Trigger the event in Smartling\n\nNote: Webhook triggers require activation. Use ngrok for local testing."
+      },
+      "id": "note-1",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -20,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "event": "translationJob.updated",
+        "projectUids": []
+      },
+      "id": "trigger-1",
+      "name": "Smartling Trigger",
+      "type": "n8n-nodes-smartling.smartlingTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "",
+      "credentials": {
+        "smartlingApi": {
+          "id": "",
+          "name": "Smartling API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "out-event",
+              "name": "eventType",
+              "value": "={{ $json.eventType || \"translationJob.updated\" }}",
+              "type": "string"
+            },
+            {
+              "id": "out-timestamp",
+              "name": "receivedAt",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "out-payload",
+              "name": "payload",
+              "value": "={{ JSON.stringify($json, null, 2) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "output-1",
+      "name": "Log Event",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Smartling Trigger": {
+      "main": [
+        [
+          {
+            "node": "Log Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "active": false
+}

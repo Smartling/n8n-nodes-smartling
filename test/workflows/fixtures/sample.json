@@ -1,0 +1,10 @@
+{
+  "greeting": "Hello, welcome to our platform!",
+  "description": "Smartling provides enterprise translation management for global businesses.",
+  "features": {
+    "translation": "Professional human translation with quality assurance",
+    "machine_translation": "Fast machine translation for rapid content delivery",
+    "workflow": "Customizable translation workflows to match your process"
+  },
+  "cta": "Get started today and reach your global audience."
+}

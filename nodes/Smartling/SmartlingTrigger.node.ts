@@ -65,6 +65,8 @@ export class SmartlingTrigger implements INodeType {
                     { name: "Translation Job Updated", value: EventTypes.TRANSLATION_JOB_UPDATED, description: "Triggers when a translation job is updated." },
                     { name: "Translation Job Completed", value: EventTypes.TRANSLATION_JOB_COMPLETED, description: "Triggers when a translation job is completed." },
                     { name: "Translation Job Canceled", value: EventTypes.TRANSLATION_JOB_CANCELED, description: "Triggers when a translation job is canceled." },
+                    // Integrations Platform events
+                    { name: "Asset Exported", value: EventTypes.INTEGRATIONS_PLATFORM_ASSET_EXPORTED, description: "Triggers when an asset is exported from the integrations platform." },
                 ],
             },
             {

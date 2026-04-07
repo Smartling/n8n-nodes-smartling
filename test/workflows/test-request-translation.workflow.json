@@ -1,0 +1,140 @@
+{
+  "name": "[Test] Smartling - Request Translation",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Setup\n1. Assign your **Smartling API** credential to the Smartling node\n2. Edit the **Config** node to set:\n   - `testFilePath` — absolute path to a file\n   - `projectUid` — your Smartling project UID\n   - `targetLocales` — comma-separated project locales\n   - `fileUri` — unique file identifier (e.g. test/sample.json)\n   - `jobType` — dailyJob or customDailyJob\n   - `customJobPrefix` / `jobReferenceNumber` — only for customDailyJob\n3. Click **Test Workflow** to run\n\nNote: targetLocales must be enabled on your project."
+      },
+      "id": "note-1",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-20, -200]
+    },
+    {
+      "parameters": {},
+      "id": "trigger-1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-testFilePath",
+              "name": "testFilePath",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "cfg-projectUid",
+              "name": "projectUid",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "cfg-targetLocales",
+              "name": "targetLocales",
+              "value": "fr-FR, de-DE, es-ES",
+              "type": "string"
+            },
+            {
+              "id": "cfg-fileUri",
+              "name": "fileUri",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "cfg-jobType",
+              "name": "jobType",
+              "value": "dailyJob",
+              "type": "string"
+            },
+            {
+              "id": "cfg-customJobPrefix",
+              "name": "customJobPrefix",
+              "value": "n8n-test",
+              "type": "string"
+            },
+            {
+              "id": "cfg-jobReferenceNumber",
+              "name": "jobReferenceNumber",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config-1",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $('Config').item.json.testFilePath }}"
+      },
+      "id": "read-file-1",
+      "name": "Read Binary File",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "resource": "translation",
+        "operation": "requestTranslation",
+        "projectUid": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Config').item.json.projectUid }}"
+        },
+        "dailyJobType": "={{ $('Config').item.json.jobType }}",
+        "dailyJobNamePrefix": "={{ $('Config').item.json.customJobPrefix }}",
+        "jobReferenceNumber": "={{ $('Config').item.json.jobReferenceNumber }}",
+        "targetLocales": "={{ $('Config').item.json.targetLocales.split(',').map(s => s.trim()) }}",
+        "translationJobAuthorize": false,
+        "binaryPropertyName": "data",
+        "fileUri": "={{ $('Config').item.json.fileUri }}",
+        "fileType": ""
+      },
+      "id": "smartling-1",
+      "name": "Smartling",
+      "type": "n8n-nodes-smartling.smartling",
+      "typeVersion": 1,
+      "position": [660, 0],
+      "credentials": {
+        "smartlingApi": {
+          "id": "",
+          "name": "Smartling API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "Config", "type": "main", "index": 0 }]]
+    },
+    "Config": {
+      "main": [[{ "node": "Read Binary File", "type": "main", "index": 0 }]]
+    },
+    "Read Binary File": {
+      "main": [[{ "node": "Smartling", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "active": false
+}
