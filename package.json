@@ -9,6 +9,10 @@
   "author": {
     "name": "Smartling"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Smartling/n8n-nodes-smartling"
+  },
   "main": "dist/nodes/Smartling/Smartling.node.js",
   "scripts": {
     "build": "tsc && npm run copy-assets",
@@ -35,7 +39,6 @@
     ]
   },
   "dependencies": {
-    "@smartling/api-sdk-nodejs-internal": "^4.3.1",
     "jszip": "^3.10.1",
     "smartling-api-sdk-nodejs": "^2.30.0",
     "zod": "^4.1.13"

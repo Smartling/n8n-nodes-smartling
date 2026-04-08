@@ -1,4 +1,4 @@
-import { WorkflowSearchParameters } from "@smartling/api-sdk-nodejs-internal";
+import { WorkflowSearchParameters } from "../../common/api/workflows-api";
 import { Context } from "../../common/context";
 
 const getWorkflowLink = (projectUid: string, workflowUid: string) =>

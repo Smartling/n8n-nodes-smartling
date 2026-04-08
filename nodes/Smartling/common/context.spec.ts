@@ -27,25 +27,33 @@ jest.mock("smartling-api-sdk-nodejs", () => ({
     AccessTokenProvider: class AccessTokenProvider {}
 }));
 
-jest.mock("@smartling/api-sdk-nodejs-internal", () => ({
-    SmartlingFileTypesApi: class SmartlingFileTypesApi {},
-    SmartlingLanguageDetectionApi: class SmartlingLanguageDetectionApi {},
+jest.mock("./api/file-types-api", () => ({
+    SmartlingFileTypesApi: class SmartlingFileTypesApi {}
+}));
+jest.mock("./api/language-detection-api", () => ({
+    SmartlingLanguageDetectionApi: class SmartlingLanguageDetectionApi {}
+}));
+jest.mock("./api/accounts-api", () => ({
     SmartlingAccountsApi: class SmartlingAccountsApi {},
-    SmartlingWorkflowsApi: class SmartlingWorkflowsApi {},
-    SmartlingLogApi: class SmartlingLogApi {},
     SearchAccountsParameters: jest.fn().mockImplementation(() => ({
         setLimit: jest.fn().mockReturnThis()
-    })),
-    CreateLogParameters: jest.fn().mockImplementation(() => ({
-        export: jest.fn().mockReturnValue({}),
-        addLogRecord: jest.fn()
-    })),
-    LogLevel: {
-        DEBUG: "DEBUG",
-        INFO: "INFO",
-        WARNING: "WARNING",
-        ERROR: "ERROR"
-    }
+    }))
+}));
+jest.mock("./api/workflows-api", () => ({
+    SmartlingWorkflowsApi: class SmartlingWorkflowsApi {}
+}));
+jest.mock("./logger", () => ({
+    RemoteLogger: jest.fn().mockImplementation(() => {
+        const contextValues: Record<string, unknown> = {};
+        return {
+            getRequestId: jest.fn().mockReturnValue("test-request-id"),
+            setContextValue: jest.fn().mockImplementation((key: string, value: unknown) => {
+                contextValues[key] = value;
+            }),
+            flush: jest.fn().mockResolvedValue(undefined),
+            getContextValue: jest.fn().mockImplementation((key: string) => contextValues[key])
+        };
+    })
 }));
 
 describe("Context", () => {

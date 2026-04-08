@@ -1,5 +1,5 @@
 import path from "path";
-import { IdentifyFileTypeParameters, SmartlingFileTypesApi } from "@smartling/api-sdk-nodejs-internal";
+import { IdentifyFileTypeParameters, SmartlingFileTypesApi } from "../api/file-types-api";
 import { RemoteLogger } from "../logger";
 import { FILE_TYPE_DETECTION_MAX_BUFFER_SIZE } from "../constants";
 import { getFileTypeByExtension } from "./file-extensions";

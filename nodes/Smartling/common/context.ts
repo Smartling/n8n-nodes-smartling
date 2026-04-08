@@ -11,14 +11,10 @@ import {
     SmartlingJobsApi,
     SmartlingJobBatchesApi
 } from "smartling-api-sdk-nodejs";
-import {
-    SmartlingFileTypesApi,
-    SmartlingLanguageDetectionApi,
-    SmartlingAccountsApi,
-    SmartlingWorkflowsApi,
-    SmartlingLogApi,
-    SearchAccountsParameters
-} from "@smartling/api-sdk-nodejs-internal";
+import { SmartlingFileTypesApi } from "./api/file-types-api";
+import { SmartlingLanguageDetectionApi } from "./api/language-detection-api";
+import { SmartlingAccountsApi, SearchAccountsParameters } from "./api/accounts-api";
+import { SmartlingWorkflowsApi } from "./api/workflows-api";
 import { SmartlingCredentials, createApiBuilder } from "./api";
 import { RemoteLogger } from "./logger";
 import { REQUEST_ID_HEADER } from "./constants";
@@ -42,9 +38,7 @@ export class Context {
     ) {
         this.credentials = credentials;
         this.apiBuilder = createApiBuilder(credentials, version);
-
-        const logApi = this.apiBuilder.build(SmartlingLogApi) as SmartlingLogApi;
-        this.logger = new RemoteLogger(logApi, actionName, logContextOverrides ?? {}, version);
+        this.logger = new RemoteLogger(actionName, logContextOverrides ?? {}, version);
 
         this.apiBuilder.setHttpClientConfiguration({
             headers: {

@@ -1,4 +1,4 @@
-import { IdentifyFileTypeParameters } from "@smartling/api-sdk-nodejs-internal";
+import { IdentifyFileTypeParameters } from "../api/file-types-api";
 import { FILE_TYPE_DETECTION_MAX_BUFFER_SIZE } from "../constants";
 import { getFileTypeByExtension } from "./file-extensions";
 import { FileType } from "./file-types";

@@ -2,7 +2,7 @@ import type { ILoadOptionsFunctions, INodePropertyOptions } from "n8n-workflow";
 import { createContext } from "../common/context";
 import type { SmartlingCredentials } from "../common/api";
 import { ListProjectsParameters } from "smartling-api-sdk-nodejs";
-import { WorkflowSearchParameters } from "@smartling/api-sdk-nodejs-internal";
+import { WorkflowSearchParameters } from "../common/api/workflows-api";
 import { extractResourceLocatorValue } from "../common/utils";
 
 const getCredentials = async (self: ILoadOptionsFunctions): Promise<SmartlingCredentials> => {
@@ -70,7 +70,7 @@ export async function getProjectWorkflows(this: ILoadOptionsFunctions): Promise<
         const workflowsApi = ctx.getWorkflowsApi();
         const params = new WorkflowSearchParameters().setProjectId(projectUid);
         const response = await workflowsApi.searchWorkflows(accountUid, params);
-        return response.items.map((workflow) => ({
+        return response.items.map((workflow: any) => ({
             name: workflow.workflowName,
             value: workflow.workflowUid,
         }));
