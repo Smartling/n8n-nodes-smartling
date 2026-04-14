@@ -114,8 +114,8 @@ describe("webhook-lifecycle", () => {
                     method: "POST",
                     path: "/webhooks-api/v2/accounts/test-account-uid/subscriptions",
                     body: expect.objectContaining({
-                        name: "[Smartling n8n] - file.published",
-                        url: "https://n8n.test/webhook/test-id",
+                        subscriptionName: "[Smartling n8n] - file.published",
+                        subscriptionUrl: "https://n8n.test/webhook/test-id",
                         events: [{ type: "file.published", schemaVersion: "1.0" }],
                     }),
                 }),

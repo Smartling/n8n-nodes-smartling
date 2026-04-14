@@ -36,7 +36,6 @@ describe("executeDownloadTranslatedFile", () => {
             path: "/files-api/v2/projects/test-project-123/locales/es-ES/file",
             qs: {
                 fileUri: "files/test-file.json",
-                fileNameMode: "TRANSFORMED",
             },
             encoding: "arraybuffer",
             returnFullResponse: true,
@@ -72,7 +71,6 @@ describe("executeDownloadTranslatedFile", () => {
             path: "/files-api/v2/projects/test-project-123/locales/es-ES/file",
             qs: {
                 fileUri: "files/test-file.json",
-                fileNameMode: "TRANSFORMED",
                 retrievalType: "PENDING",
                 includeOriginalStrings: "true",
             },
