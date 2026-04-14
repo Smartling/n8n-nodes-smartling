@@ -1,42 +1,38 @@
-import { SmartlingMachineTranslationsApi } from "smartling-api-sdk-nodejs";
-import { Context } from "../../common/context";
-import { createContextMock } from "../../../../test/mocks";
 import {
     MAX_TEXT_ITEMS_FOR_TRANSLATION,
-    MAX_TEXT_LENGTH_FOR_TRANSLATION
+    MAX_TEXT_LENGTH_FOR_TRANSLATION,
 } from "../../common/constants";
 import { executeTextMt } from "./execute";
 
+const mockSmartlingRequest = jest.fn();
+jest.mock("../../common/smartling-api", () => ({
+    smartlingRequest: (...args: any[]) => mockSmartlingRequest(...args),
+}));
+
 describe("executeTextMt", () => {
-    let contextMock: Context;
-    let mtApiMock: jest.Mocked<Pick<SmartlingMachineTranslationsApi, "translate">>;
-    let languageDetectionApiMock: jest.Mocked<{ detectLanguage: jest.Mock }>;
+    const mockContext = {};
 
     beforeEach(() => {
-        contextMock = createContextMock();
-        mtApiMock = contextMock.getMTApi() as any;
-        languageDetectionApiMock = contextMock.getLanguageDetectionApi() as any;
+        mockSmartlingRequest.mockReset();
     });
 
     test("translates single text item", async () => {
-        mtApiMock.translate = jest.fn().mockResolvedValue({
-            items: [
-                { key: "key.1", translationText: "Hallo Welt" }
-            ]
+        mockSmartlingRequest.mockResolvedValue({
+            items: [{ key: "key.1", translationText: "Hallo Welt" }],
         });
 
-        const result = await executeTextMt(contextMock, "testAccountUid", "en-US", "de-DE", "Hello world");
+        const result = await executeTextMt(mockContext, "testAccountUid", "en-US", "de-DE", "Hello world");
 
-        expect(mtApiMock.translate).toHaveBeenCalledWith(
-            "testAccountUid",
+        expect(mockSmartlingRequest).toHaveBeenCalledWith(
+            mockContext,
             expect.objectContaining({
-                parameters: {
+                method: "POST",
+                path: "/mt-router-api/v2/accounts/testAccountUid/smartling-mt",
+                body: expect.objectContaining({
                     sourceLocaleId: "en-US",
                     targetLocaleId: "de-DE",
-                    items: [
-                        { key: "key.1", sourceText: "Hello world" }
-                    ]
-                }
+                    items: [{ key: "key.1", sourceText: "Hello world" }],
+                }),
             })
         );
 
@@ -44,31 +40,31 @@ describe("executeTextMt", () => {
             sourceLocaleId: "en-US",
             targetLocaleId: "de-DE",
             source: { string_1: "Hello world" },
-            translated: { string_1: "Hallo Welt" }
+            translated: { string_1: "Hallo Welt" },
         });
     });
 
     test("translates multiple text items (newline-separated)", async () => {
-        mtApiMock.translate = jest.fn().mockResolvedValue({
+        mockSmartlingRequest.mockResolvedValue({
             items: [
                 { key: "key.1", translationText: "Hola" },
-                { key: "key.2", translationText: "Mundo" }
-            ]
+                { key: "key.2", translationText: "Mundo" },
+            ],
         });
 
-        const result = await executeTextMt(contextMock, "testAccountUid", "en-US", "es-ES", "Hello\nWorld");
+        const result = await executeTextMt(mockContext, "testAccountUid", "en-US", "es-ES", "Hello\nWorld");
 
-        expect(mtApiMock.translate).toHaveBeenCalledWith(
-            "testAccountUid",
+        expect(mockSmartlingRequest).toHaveBeenCalledWith(
+            mockContext,
             expect.objectContaining({
-                parameters: {
+                body: expect.objectContaining({
                     sourceLocaleId: "en-US",
                     targetLocaleId: "es-ES",
                     items: [
                         { key: "key.1", sourceText: "Hello" },
-                        { key: "key.2", sourceText: "World" }
-                    ]
-                }
+                        { key: "key.2", sourceText: "World" },
+                    ],
+                }),
             })
         );
 
@@ -76,49 +72,58 @@ describe("executeTextMt", () => {
             sourceLocaleId: "en-US",
             targetLocaleId: "es-ES",
             source: { string_1: "Hello", string_2: "World" },
-            translated: { string_1: "Hola", string_2: "Mundo" }
+            translated: { string_1: "Hola", string_2: "Mundo" },
         });
     });
 
     test("detects source locale when not provided", async () => {
-        languageDetectionApiMock.detectLanguage.mockResolvedValue({
-            languages: [{ defaultLocaleId: "en-US" }]
-        });
+        mockSmartlingRequest
+            .mockResolvedValueOnce({
+                languages: [{ defaultLocaleId: "en-US" }],
+            })
+            .mockResolvedValueOnce({
+                items: [{ key: "key.1", translationText: "Hallo Welt" }],
+            });
 
-        mtApiMock.translate = jest.fn().mockResolvedValue({
-            items: [
-                { key: "key.1", translationText: "Hallo Welt" }
-            ]
-        });
+        const result = await executeTextMt(mockContext, "testAccountUid", undefined, "de-DE", "Hello world");
 
-        const result = await executeTextMt(contextMock, "testAccountUid", undefined, "de-DE", "Hello world");
+        expect(mockSmartlingRequest).toHaveBeenNthCalledWith(
+            1,
+            mockContext,
+            expect.objectContaining({
+                method: "POST",
+                path: "/language-detection-api/v1/detect/language",
+                body: { text: "Hello world" },
+            })
+        );
 
-        expect(languageDetectionApiMock.detectLanguage).toHaveBeenCalledWith("Hello world");
         expect(result).toEqual({
             sourceLocaleId: "en-US",
             targetLocaleId: "de-DE",
             source: { string_1: "Hello world" },
-            translated: { string_1: "Hallo Welt" }
+            translated: { string_1: "Hallo Welt" },
         });
     });
 
     test("skips detection when source locale is provided", async () => {
-        mtApiMock.translate = jest.fn().mockResolvedValue({
-            items: [
-                { key: "key.1", translationText: "Hallo Welt" }
-            ]
+        mockSmartlingRequest.mockResolvedValue({
+            items: [{ key: "key.1", translationText: "Hallo Welt" }],
         });
 
-        await executeTextMt(contextMock, "testAccountUid", "en-US", "de-DE", "Hello world");
+        await executeTextMt(mockContext, "testAccountUid", "en-US", "de-DE", "Hello world");
 
-        expect(languageDetectionApiMock.detectLanguage).not.toHaveBeenCalled();
+        expect(mockSmartlingRequest).toHaveBeenCalledTimes(1);
+        expect(mockSmartlingRequest).not.toHaveBeenCalledWith(
+            mockContext,
+            expect.objectContaining({ path: "/language-detection-api/v1/detect/language" })
+        );
     });
 
     test("throws error when text is too long", async () => {
         const tooLongText = "a".repeat(MAX_TEXT_LENGTH_FOR_TRANSLATION + 1);
 
         await expect(
-            executeTextMt(contextMock, "testAccountUid", "en-US", "de-DE", tooLongText)
+            executeTextMt(mockContext, "testAccountUid", "en-US", "de-DE", tooLongText)
         ).rejects.toThrow(
             `Source text is too long. Maximum allowed length is ${MAX_TEXT_LENGTH_FOR_TRANSLATION}.`
         );
@@ -128,44 +133,30 @@ describe("executeTextMt", () => {
         const lines = new Array(MAX_TEXT_ITEMS_FOR_TRANSLATION + 1).fill("text").join("\n");
 
         await expect(
-            executeTextMt(contextMock, "testAccountUid", "en-US", "de-DE", lines)
+            executeTextMt(mockContext, "testAccountUid", "en-US", "de-DE", lines)
         ).rejects.toThrow(
             `Too many source text items. Maximum allowed number is ${MAX_TEXT_ITEMS_FOR_TRANSLATION}.`
         );
     });
 
-    test("calls logger info and flush", async () => {
-        mtApiMock.translate = jest.fn().mockResolvedValue({
-            items: [
-                { key: "key.1", translationText: "Hallo Welt" }
-            ]
-        });
-
-        await executeTextMt(contextMock, "testAccountUid", "en-US", "de-DE", "Hello world");
-
-        expect(contextMock.logger.info).toHaveBeenCalled();
-    });
-
     test("throws error when translation is empty", async () => {
-        mtApiMock.translate = jest.fn().mockResolvedValue({
-            items: []
-        });
+        mockSmartlingRequest.mockResolvedValue({ items: [] });
 
         await expect(
-            executeTextMt(contextMock, "testAccountUid", "en-US", "de-DE", "Hello world")
+            executeTextMt(mockContext, "testAccountUid", "en-US", "de-DE", "Hello world")
         ).rejects.toThrow("Translation is empty.");
     });
 
     test("trims and filters empty lines from input", async () => {
-        mtApiMock.translate = jest.fn().mockResolvedValue({
+        mockSmartlingRequest.mockResolvedValue({
             items: [
                 { key: "key.1", translationText: "Hola" },
-                { key: "key.2", translationText: "Mundo" }
-            ]
+                { key: "key.2", translationText: "Mundo" },
+            ],
         });
 
         const result = await executeTextMt(
-            contextMock,
+            mockContext,
             "testAccountUid",
             "en-US",
             "es-ES",
@@ -176,45 +167,43 @@ describe("executeTextMt", () => {
             sourceLocaleId: "en-US",
             targetLocaleId: "es-ES",
             source: { string_1: "Hello", string_2: "World" },
-            translated: { string_1: "Hola", string_2: "Mundo" }
+            translated: { string_1: "Hola", string_2: "Mundo" },
         });
     });
 
     test("constructs locale from languageId and defaultCountryId when defaultLocaleId is missing", async () => {
-        languageDetectionApiMock.detectLanguage.mockResolvedValue({
-            languages: [{ languageId: "en", defaultCountryId: "US" }]
-        });
+        mockSmartlingRequest
+            .mockResolvedValueOnce({
+                languages: [{ languageId: "en", defaultCountryId: "US" }],
+            })
+            .mockResolvedValueOnce({
+                items: [{ key: "key.1", translationText: "Hallo Welt" }],
+            });
 
-        mtApiMock.translate = jest.fn().mockResolvedValue({
-            items: [{ key: "key.1", translationText: "Hallo Welt" }]
-        });
-
-        const result = await executeTextMt(contextMock, "testAccountUid", undefined, "de-DE", "Hello world");
+        const result = await executeTextMt(mockContext, "testAccountUid", undefined, "de-DE", "Hello world");
 
         expect(result.sourceLocaleId).toEqual("en-US");
     });
 
     test("returns languageId when both defaultLocaleId and defaultCountryId are missing", async () => {
-        languageDetectionApiMock.detectLanguage.mockResolvedValue({
-            languages: [{ languageId: "en" }]
-        });
+        mockSmartlingRequest
+            .mockResolvedValueOnce({
+                languages: [{ languageId: "en" }],
+            })
+            .mockResolvedValueOnce({
+                items: [{ key: "key.1", translationText: "Hallo Welt" }],
+            });
 
-        mtApiMock.translate = jest.fn().mockResolvedValue({
-            items: [{ key: "key.1", translationText: "Hallo Welt" }]
-        });
-
-        const result = await executeTextMt(contextMock, "testAccountUid", undefined, "de-DE", "Hello world");
+        const result = await executeTextMt(mockContext, "testAccountUid", undefined, "de-DE", "Hello world");
 
         expect(result.sourceLocaleId).toEqual("en");
     });
 
     test("throws error when language detection returns no languages", async () => {
-        languageDetectionApiMock.detectLanguage.mockResolvedValue({
-            languages: []
-        });
+        mockSmartlingRequest.mockResolvedValue({ languages: [] });
 
         await expect(
-            executeTextMt(contextMock, "testAccountUid", undefined, "de-DE", "Hello world")
+            executeTextMt(mockContext, "testAccountUid", undefined, "de-DE", "Hello world")
         ).rejects.toThrow("Language detection didn't return any language.");
     });
 });

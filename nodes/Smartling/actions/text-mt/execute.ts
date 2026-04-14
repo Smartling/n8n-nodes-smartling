@@ -1,45 +1,29 @@
-import { SmartlingMTParameters } from "smartling-api-sdk-nodejs";
-import { Context } from "../../common/context";
+import { smartlingRequest } from "../../common/smartling-api";
 import {
     MAX_TEXT_ITEMS_FOR_TRANSLATION,
-    MAX_TEXT_LENGTH_FOR_TRANSLATION
+    MAX_TEXT_LENGTH_FOR_TRANSLATION,
 } from "../../common/constants";
 
 const TRANSLATION_KEY_PREFIX = "key";
 const TRANSLATION_KEY_SEPARATOR = ".";
 const RESPONSE_KEY_PREFIX = "string_";
 
-const getLocaleIdFromResponse = (response: {
-    defaultLocaleId?: string;
-    languageId: string;
-    defaultCountryId?: string;
-}): string => {
-    if (response.defaultLocaleId) {
-        return response.defaultLocaleId;
-    }
-    return response.defaultCountryId
-        ? `${response.languageId}-${response.defaultCountryId}`
-        : response.languageId;
-};
+const detectSourceLocale = async (context: any, content: string): Promise<string> => {
+    const result = await smartlingRequest(context, {
+        method: "POST",
+        path: "/language-detection-api/v1/detect/language",
+        body: { text: content },
+    });
 
-const detectSourceLocale = async (ctx: Context, content: string): Promise<string> => {
-    ctx.logger.debug("Starting language detection.", { content });
-
-    const result = await ctx.getLanguageDetectionApi().detectLanguage(content);
-
-    if (!result.languages.length) {
+    if (!result.languages?.length) {
         throw new Error("Language detection didn't return any language.");
     }
 
-    const localeId = getLocaleIdFromResponse(result.languages[0]);
-
-    ctx.logger.info("Source locale successfully detected.", {
-        content,
-        localeId,
-        response: JSON.stringify(result)
-    });
-
-    return localeId;
+    const lang = result.languages[0];
+    if (lang.defaultLocaleId) return lang.defaultLocaleId;
+    return lang.defaultCountryId
+        ? `${lang.languageId}-${lang.defaultCountryId}`
+        : lang.languageId;
 };
 
 const prepareAndValidateInputText = (value: string): string[] => {
@@ -66,40 +50,31 @@ const prepareAndValidateInputText = (value: string): string[] => {
 };
 
 export const executeTextMt = async (
-    ctx: Context,
+    context: any,
     accountUid: string,
     sourceLocale: string | undefined,
     targetLocale: string,
     sourceText: string
 ): Promise<Record<string, unknown>> => {
-    ctx.logger.info("Text MT translation started.", { sourceLocale, targetLocale, sourceText });
-
     const sourceTextItems = prepareAndValidateInputText(sourceText);
 
-    const sourceLocaleId = sourceLocale || await detectSourceLocale(ctx, sourceTextItems[0]);
+    const sourceLocaleId = sourceLocale || await detectSourceLocale(context, sourceTextItems[0]);
     const targetLocaleId = targetLocale;
 
-    const params = new SmartlingMTParameters(
-        sourceLocaleId,
-        targetLocaleId,
-        sourceTextItems.map((text, index) => ({
-            key: `${TRANSLATION_KEY_PREFIX}${TRANSLATION_KEY_SEPARATOR}${index + 1}`,
-            sourceText: text
-        }))
-    );
+    const items = sourceTextItems.map((text, index) => ({
+        key: `${TRANSLATION_KEY_PREFIX}${TRANSLATION_KEY_SEPARATOR}${index + 1}`,
+        sourceText: text,
+    }));
 
-    const translation = await ctx.getMTApi().translate(accountUid, params);
+    const translation = await smartlingRequest(context, {
+        method: "POST",
+        path: `/mt-router-api/v2/accounts/${accountUid}/smartling-mt`,
+        body: { sourceLocaleId, targetLocaleId, items },
+    });
 
-    if (!translation.items.length) {
+    if (!translation.items?.length) {
         throw new Error("Translation is empty.");
     }
-
-    ctx.logger.info("Text translation successfully complete.", {
-        sourceLocaleId,
-        targetLocaleId,
-        source: sourceText,
-        translation: JSON.stringify(translation.items)
-    });
 
     translation.items.sort((left: { key: string }, right: { key: string }) => {
         const lengthDiff = left.key.length - right.key.length;
@@ -111,8 +86,9 @@ export const executeTextMt = async (
         return acc;
     }, {});
 
-    const translated = translation.items.reduce<Record<string, string>>(
-        (acc: Record<string, string>, item: { key: string; translationText: string }) => {
+    const translatedItems: Array<{ key: string; translationText: string }> = translation.items;
+    const translated = translatedItems.reduce<Record<string, string>>(
+        (acc, item) => {
             const index = item.key.split(TRANSLATION_KEY_SEPARATOR)[1];
             acc[`${RESPONSE_KEY_PREFIX}${index}`] = item.translationText;
             return acc;
@@ -120,10 +96,5 @@ export const executeTextMt = async (
         {}
     );
 
-    return {
-        sourceLocaleId,
-        targetLocaleId,
-        source,
-        translated
-    };
+    return { sourceLocaleId, targetLocaleId, source, translated };
 };
