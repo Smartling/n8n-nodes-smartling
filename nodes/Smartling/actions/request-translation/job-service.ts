@@ -1,21 +1,8 @@
-import {
-    BatchItemStatus,
-    CreateBatchParameters,
-    FileType as SdkFileType,
-    JobBatchesParameters,
-    JobBatchesParametersMode,
-    UpdateJobParameters,
-    UploadBatchFileParameters
-} from "smartling-api-sdk-nodejs";
-import { pollUntil } from "../../common/utils";
+import { smartlingRequest } from "../../common/smartling-api";
 import { FileType } from "../../common/files";
-import { Context } from "../../common/context";
 
 export const DAILY_JOB_NAME_TEMPLATE = "[{prefix}] Daily bucket job for n8n content {yyyy-MM-dd}";
 export const DAILY_JOB_TZ = "UTC";
-export const BATCH_STATUS_POLLING_INITIAL_DELAY = 1000;
-export const BATCH_STATUS_POLLING_INTERVAL = 3000;
-export const DEFAULT_MAX_POLL_DURATION = 300_000;
 
 export type DailyJobType = "dailyJob" | "customDailyJob";
 
@@ -41,7 +28,6 @@ export interface AddFileToJobInput {
     targetLocalesIds: string[];
     fileContent: Buffer;
     fileType: FileType;
-    startTime: number;
 }
 
 export const buildJobName = (input: BuildJobNameArgs): string => {
@@ -56,7 +42,7 @@ export const buildJobName = (input: BuildJobNameArgs): string => {
 };
 
 export const retrieveJob = async (
-    ctx: Context,
+    context: any,
     input: RetrieveJobInput
 ) => {
     const {
@@ -66,20 +52,18 @@ export const retrieveJob = async (
         referenceNumber,
         targetLocalesIds
     } = input;
-    const jobBatchesApi = ctx.getJobBatchesApi();
-    const jobsApi = ctx.getJobsApi();
     const jobName = buildJobName({ jobType, jobNamePrefix });
 
-    ctx.logger.debug(`Creating/reusing daily job. jobName="${jobName}"`);
-
-    const createdJob = await jobBatchesApi.createJob(
-        projectUid,
-        jobName,
-        new JobBatchesParameters()
-            .setMode(JobBatchesParametersMode.REUSE_EXISTING)
-            .setTargetLocaleIds(targetLocalesIds)
-            .setTimeZoneName(DAILY_JOB_TZ)
-    );
+    const createdJob = await smartlingRequest(context, {
+        method: "POST",
+        path: `/job-batches-api/v2/projects/${projectUid}/jobs`,
+        body: {
+            nameTemplate: jobName,
+            mode: "REUSE_EXISTING",
+            targetLocaleIds: targetLocalesIds,
+            timeZoneName: DAILY_JOB_TZ,
+        },
+    });
 
     const {
         translationJobUid,
@@ -87,22 +71,21 @@ export const retrieveJob = async (
     } = createdJob;
 
     if (jobType === "customDailyJob" && referenceNumber) {
-        await jobsApi.updateJob(
-            projectUid,
-            translationJobUid,
-            new UpdateJobParameters()
-                .setName(actualName)
-                .setReferenceNumber(referenceNumber)
-        );
+        await smartlingRequest(context, {
+            method: "PUT",
+            path: `/jobs-api/v3/projects/${projectUid}/jobs/${translationJobUid}`,
+            body: {
+                name: actualName,
+                referenceNumber,
+            },
+        });
     }
-
-    ctx.logger.debug(`Created/reused daily job. jobName="${jobName}", actualJobName=${actualName}, translationJobUid=${translationJobUid}`);
 
     return createdJob;
 };
 
 export const addFileToJob = async (
-    ctx: Context,
+    context: any,
     input: AddFileToJobInput
 ) => {
     const {
@@ -113,75 +96,87 @@ export const addFileToJob = async (
         workflowUid,
         targetLocalesIds,
         fileType,
-        fileContent,
-        startTime
+        fileContent
     } = input;
 
-    const params = new CreateBatchParameters()
-        .setTranslationJobUid(translationJobUid)
-        .setAuthorize(authorize)
-        .addFileUri(fileUri);
-
+    const localeWorkflows: Array<{ targetLocaleId: string; workflowUid: string }> = [];
     if (authorize && workflowUid) {
         targetLocalesIds.forEach(localeId => {
-            params.addLocaleWorkflows(localeId, workflowUid);
+            localeWorkflows.push({ targetLocaleId: localeId, workflowUid });
         });
     }
 
-    const jobBatchesApi = ctx.getJobBatchesApi();
+    const batch = await smartlingRequest(context, {
+        method: "POST",
+        path: `/job-batches-api/v2/projects/${projectUid}/batches`,
+        body: {
+            translationJobUid,
+            authorize,
+            fileUris: [fileUri],
+            localeWorkflows,
+        },
+    });
 
-    ctx.logger.debug(`Creating job batch. translationJobUid="${translationJobUid}"`);
-    const batch = await jobBatchesApi.createBatch(
-        projectUid,
-        params
-    );
     const { batchUid } = batch;
-    ctx.logger.debug(`Created job batch. translationJobUid="${translationJobUid}" batchUid="${batchUid}"`);
 
-    ctx.logger.debug(`Adding file to the batch. translationJobUid="${translationJobUid}" batchUid="${batchUid}" fileUri="${fileUri}"`);
+    // Build multipart body for file upload
+    const boundary = "----n8nSmartlingBoundary" + Date.now().toString(36);
 
-    await jobBatchesApi.uploadBatchFile(
-        projectUid,
-        batchUid,
-        new UploadBatchFileParameters()
-            .setFileUri(fileUri)
-            .setFileType(fileType as unknown as SdkFileType)
-            .setLocalesToApprove(targetLocalesIds)
-            .setFileContent(fileContent as unknown as string)
-    );
-    ctx.logger.debug(`Added file to the batch. translationJobUid="${translationJobUid}" batchUid="${batchUid}" fileUri="${fileUri}"`);
+    const parts: Buffer[] = [];
 
-    ctx.logger.debug(`Getting batch status. translationJobUid="${translationJobUid}" batchUid="${batchUid}" fileUri="${fileUri}"`);
+    // fileUri field
+    parts.push(Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="fileUri"\r\n\r\n${fileUri}\r\n`
+    ));
 
-    const elapsed = Date.now() - startTime;
-    const maxDuration = DEFAULT_MAX_POLL_DURATION - elapsed;
+    // fileType field
+    parts.push(Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="fileType"\r\n\r\n${fileType}\r\n`
+    ));
 
-    const result = await pollUntil(
-        async () => jobBatchesApi.getBatchStatus(projectUid, batchUid),
-        {
-            initialDelay: BATCH_STATUS_POLLING_INITIAL_DELAY,
-            delayBetweenAttempts: BATCH_STATUS_POLLING_INTERVAL,
-            maxDuration,
-            exitCondition: (data) => {
-                if (!data.files?.length) return true;
-                return data.files[0].status !== BatchItemStatus.ATTACHING && data.files[0].status !== ("UPLOADING" as any);
-            },
-            returnLastOnTimeout: true
-        }
-    );
+    // localesApprove[] fields
+    for (const localeId of targetLocalesIds) {
+        parts.push(Buffer.from(
+            `--${boundary}\r\nContent-Disposition: form-data; name="localesApprove[]"\r\n\r\n${localeId}\r\n`
+        ));
+    }
+
+    // file field
+    parts.push(Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileUri}"\r\nContent-Type: application/octet-stream\r\n\r\n`
+    ));
+    parts.push(fileContent);
+    parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+
+    const body = Buffer.concat(parts);
+
+    await smartlingRequest(context, {
+        method: "POST",
+        path: `/job-batches-api/v2/projects/${projectUid}/batches/${batchUid}/file`,
+        body,
+        headers: {
+            "Content-Type": `multipart/form-data; boundary=${boundary}`,
+        },
+    });
+
+    // Check batch status once (no polling)
+    const result = await smartlingRequest(context, {
+        method: "GET",
+        path: `/job-batches-api/v2/projects/${projectUid}/batches/${batchUid}`,
+    });
 
     if (!result.files?.length) {
         throw new Error("Batch status returned no files.");
     }
 
-    if (
-        result.files[0].status === BatchItemStatus.ATTACH_FAILED
-        || result.files[0].status === BatchItemStatus.UPLOAD_FAILED
-    ) {
+    const fileStatus = result.files[0].status;
+
+    if (fileStatus === "ATTACH_FAILED" || fileStatus === "UPLOAD_FAILED") {
         throw new Error(
             `File upload failed. Details: ${JSON.stringify(result.files[0].errors)}`
         );
     }
 
-    return result;
+    // If still ATTACHING or UPLOADING, return as-is with batchUid for user to check later
+    return { ...result, batchUid };
 };

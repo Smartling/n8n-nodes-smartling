@@ -1,11 +1,10 @@
-import { WorkflowSearchParameters } from "../../common/api/workflows-api";
-import { Context } from "../../common/context";
+import { smartlingRequest } from "../../common/smartling-api";
 
 const getWorkflowLink = (projectUid: string, workflowUid: string) =>
     `https://dashboard.smartling.com/app/projects/${projectUid}/dynamic-workflows/index.html?workflowUidSearch=${workflowUid}`;
 
 export const validateWorkflow = async (
-    ctx: Context,
+    context: any,
     projectUid: string,
     accountUid: string,
     authorize: boolean,
@@ -14,23 +13,29 @@ export const validateWorkflow = async (
 ) => {
     if (!authorize || !workflowUid) return;
 
-    const params = new WorkflowSearchParameters().setProjectId(projectUid);
     const [workflowsResponse, projectsResponse] = await Promise.all([
-        ctx.getWorkflowsApi().searchWorkflows(accountUid, params),
-        ctx.getProjectsApi().getProjectDetails(projectUid)
+        smartlingRequest(context, {
+            method: "POST",
+            path: `/workflows-api/v3/accounts/${accountUid}/workflows`,
+            body: { projectId: projectUid },
+        }),
+        smartlingRequest(context, {
+            method: "GET",
+            path: `/projects-api/v2/projects/${projectUid}`,
+        }),
     ]);
 
-    const workflow = workflowsResponse.items.find((w: any) => w.workflowUid === workflowUid);
+    const workflow = workflowsResponse.items?.find((w: any) => w.workflowUid === workflowUid);
 
     if (!workflow) {
-        throw new Error(
-            `Can not retrieve information for provided workflow ${workflowUid}`
-        );
+        throw new Error(`Can not retrieve information for provided workflow ${workflowUid}`);
     }
 
     const link = getWorkflowLink(projectUid, workflowUid);
     const projectSourceLocaleId = projectsResponse.sourceLocaleId;
-    const workflowLocalePairs = workflow.localePairs?.find((p: any) => p.sourceLocaleId === projectSourceLocaleId);
+    const workflowLocalePairs = workflow.localePairs?.find(
+        (p: any) => p.sourceLocaleId === projectSourceLocaleId
+    );
 
     if (!workflowLocalePairs || !Array.isArray(workflowLocalePairs.targetLocaleIds)) {
         throw new Error(
@@ -38,11 +43,15 @@ export const validateWorkflow = async (
         );
     }
 
-    const missingLocaleIds = targetLocalesIds.filter((id: string) => !workflowLocalePairs.targetLocaleIds.includes(id));
+    const missingLocaleIds = targetLocalesIds.filter(
+        (id: string) => !workflowLocalePairs.targetLocaleIds.includes(id)
+    );
 
     if (missingLocaleIds.length > 0) {
         const missingLocaleDescriptions = missingLocaleIds
-            .map((id: string) => projectsResponse.targetLocales.find((l: any) => l.localeId === id)?.description)
+            .map((id: string) =>
+                projectsResponse.targetLocales?.find((l: any) => l.localeId === id)?.description
+            )
             .filter(Boolean)
             .join(", ");
 

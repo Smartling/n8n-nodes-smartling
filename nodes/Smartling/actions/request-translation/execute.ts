@@ -1,4 +1,3 @@
-import { Context } from "../../common/context";
 import { FileType } from "../../common/files";
 import { detectFileType, FileContentForDetection } from "../../common/files/file-type";
 import { retrieveJob, addFileToJob, DailyJobType } from "./job-service";
@@ -20,7 +19,7 @@ export interface RequestTranslationParams {
 }
 
 const detectFileTypeIfRequired = async (
-    ctx: Context,
+    context: any,
     fileType: string | undefined,
     fileBuffer: Buffer,
     fileName: string
@@ -34,25 +33,15 @@ const detectFileTypeIfRequired = async (
         content: fileBuffer
     };
 
-    return detectFileType(ctx.logger, fileContent, ctx.getFileTypeApi());
+    return detectFileType(context, fileContent);
 };
 
 export const executeRequestTranslation = async (
-    ctx: Context,
+    context: any,
     params: RequestTranslationParams
 ): Promise<Record<string, unknown>> => {
-    const startTime = Date.now();
-
-    ctx.logger.info("Request Translation action started.", {
-        projectUid: params.projectUid,
-        dailyJobType: params.dailyJobType,
-        targetLocales: params.targetLocales,
-        fileUri: params.fileUri,
-        authorize: params.translationJobAuthorize
-    });
-
     await validateWorkflow(
-        ctx,
+        context,
         params.projectUid,
         params.accountUid,
         params.translationJobAuthorize,
@@ -61,13 +50,13 @@ export const executeRequestTranslation = async (
     );
 
     const fileType = await detectFileTypeIfRequired(
-        ctx,
+        context,
         params.fileType,
         params.fileBuffer,
         params.fileName
     );
 
-    const job = await retrieveJob(ctx, {
+    const job = await retrieveJob(context, {
         projectUid: params.projectUid,
         jobType: params.dailyJobType as DailyJobType,
         jobNamePrefix: params.dailyJobNamePrefix,
@@ -75,7 +64,7 @@ export const executeRequestTranslation = async (
         targetLocalesIds: params.targetLocales
     });
 
-    const batchResult = await addFileToJob(ctx, {
+    const batchResult = await addFileToJob(context, {
         projectUid: params.projectUid,
         translationJobUid: job.translationJobUid,
         authorize: params.translationJobAuthorize,
@@ -83,19 +72,7 @@ export const executeRequestTranslation = async (
         workflowUid: params.targetLanguageWorkflow,
         targetLocalesIds: params.targetLocales,
         fileContent: params.fileBuffer,
-        fileType,
-        startTime
-    });
-
-    ctx.logger.info("Request Translation completed successfully.", {
-        projectUid: params.projectUid,
-        translationJobUid: job.translationJobUid,
-        translationJobName: job.jobName,
-        fileUri: params.fileUri,
-        workflowUid: params.targetLanguageWorkflow,
-        targetLocales: params.targetLocales,
-        fileType,
-        authorize: params.translationJobAuthorize
+        fileType
     });
 
     const file = batchResult.files[0];
@@ -113,6 +90,7 @@ export const executeRequestTranslation = async (
     if (file) {
         return {
             ...output,
+            batchUid: batchResult.batchUid,
             fileUri: file.fileUri,
             fileUploadStatus: file.status,
             fileUploadErrors: file.errors,
