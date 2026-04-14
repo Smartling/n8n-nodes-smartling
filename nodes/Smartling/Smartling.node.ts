@@ -308,10 +308,13 @@ export class Smartling implements INodeType {
                     if (error instanceof NodeOperationError) {
                         throw error;
                     }
+                    const errMsg = (error as any).description
+                        ?? (error as any).cause?.message
+                        ?? (error as Error).message;
                     throw new NodeOperationError(
                         this.getNode(),
-                        (error as Error).message,
-                        { itemIndex: i },
+                        errMsg,
+                        { itemIndex: i, description: JSON.stringify((error as any).cause ?? (error as any).httpCode ?? "") },
                     );
                 }
             }

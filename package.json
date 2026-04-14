@@ -15,7 +15,7 @@
   },
   "main": "dist/nodes/Smartling/Smartling.node.js",
   "scripts": {
-    "build": "tsc && npm run copy-assets",
+    "build": "npm run clean && tsc && npm run copy-assets",
     "copy-assets": "cp nodes/Smartling/*.svg dist/nodes/Smartling/ && cp nodes/Smartling/*.node.json dist/nodes/Smartling/ && cp nodes/Smartling/*.svg dist/credentials/",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
@@ -38,11 +38,7 @@
       "dist/nodes/Smartling/SmartlingTrigger.node.js"
     ]
   },
-  "dependencies": {
-    "jszip": "^3.10.1",
-    "smartling-api-sdk-nodejs": "^2.30.0",
-    "zod": "^4.1.13"
-  },
+  "dependencies": {},
   "peerDependencies": {
     "n8n-workflow": "*"
   },

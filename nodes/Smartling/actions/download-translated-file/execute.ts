@@ -17,7 +17,6 @@ export const executeDownloadTranslatedFile = async (
 ): Promise<DownloadResult> => {
     const qs: Record<string, string> = {
         fileUri,
-        fileNameMode: "TRANSFORMED",
     };
     if (retrievalType) {
         qs.retrievalType = retrievalType;

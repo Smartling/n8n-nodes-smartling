@@ -134,10 +134,10 @@ export const addFileToJob = async (
         `--${boundary}\r\nContent-Disposition: form-data; name="fileType"\r\n\r\n${fileType}\r\n`
     ));
 
-    // localesApprove[] fields
+    // localeIdsToAuthorize[] fields
     for (const localeId of targetLocalesIds) {
         parts.push(Buffer.from(
-            `--${boundary}\r\nContent-Disposition: form-data; name="localesApprove[]"\r\n\r\n${localeId}\r\n`
+            `--${boundary}\r\nContent-Disposition: form-data; name="localeIdsToAuthorize[]"\r\n\r\n${localeId}\r\n`
         ));
     }
 

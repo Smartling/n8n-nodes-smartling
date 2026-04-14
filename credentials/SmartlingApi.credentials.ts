@@ -34,6 +34,13 @@ export class SmartlingApi implements ICredentialType {
             required: true,
             description: "API Token Secret from Smartling Dashboard",
         },
+        {
+            displayName: "Access Token",
+            name: "accessToken",
+            type: "hidden",
+            typeOptions: { expirable: true },
+            default: "",
+        },
     ];
 
     async preAuthentication(

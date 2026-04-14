@@ -15,14 +15,21 @@ export async function smartlingRequest(
     context: any,
     options: SmartlingRequestOptions
 ): Promise<any> {
+    const isJsonBody = options.body !== undefined && !(options.body instanceof Buffer);
+    const isBinaryResponse = options.encoding === "arraybuffer";
+
     const requestOptions: IHttpRequestOptions = {
         method: options.method,
         url: `${API_URL}${options.path}`,
-        json: options.body instanceof Buffer ? false : true,
+        json: isJsonBody && !isBinaryResponse,
     };
 
     if (options.body) {
-        requestOptions.body = options.body;
+        if (isJsonBody) {
+            requestOptions.body = options.body;
+        } else {
+            requestOptions.body = options.body;
+        }
     }
     if (options.qs) {
         requestOptions.qs = options.qs as any;
@@ -37,17 +44,49 @@ export async function smartlingRequest(
         requestOptions.returnFullResponse = true;
     }
 
-    const response = await context.helpers.httpRequestWithAuthentication.call(
-        context,
-        "smartlingApi",
-        requestOptions
-    );
+    try {
+        const response = await context.helpers.httpRequestWithAuthentication.call(
+            context,
+            "smartlingApi",
+            requestOptions
+        );
 
-    // Smartling wraps responses in { response: { code: "SUCCESS", data: ... } }
-    if (response?.response?.data !== undefined) {
-        return response.response.data;
+        // For binary/full responses, return as-is (caller needs headers)
+        if (options.returnFullResponse) {
+            return response;
+        }
+
+        // Smartling wraps responses in { response: { code: "SUCCESS", data: ... } }
+        if (response?.response?.data !== undefined) {
+            return response.response.data;
+        }
+        return response;
+    } catch (error: any) {
+        // Try every known location for the API response body
+        const responseBody = error.cause?.response?.body
+            ?? error.response?.body
+            ?? error.body
+            ?? error.cause?.body
+            ?? error.description
+            ?? error.cause?.description;
+
+        let detail = "";
+        if (responseBody) {
+            if (Buffer.isBuffer(responseBody) || responseBody?.type === "Buffer") {
+                detail = Buffer.from(responseBody.data ?? responseBody).toString("utf-8");
+            } else if (typeof responseBody === "string") {
+                detail = responseBody;
+            } else {
+                detail = JSON.stringify(responseBody);
+            }
+        }
+
+        // Always include the method + path for debugging
+        const msg = detail
+            ? `Smartling API error on ${options.method} ${options.path}: ${detail}`
+            : `Smartling API error on ${options.method} ${options.path}: ${error.message}`;
+        throw new Error(msg);
     }
-    return response;
 }
 
 export async function resolveAccountUid(context: any): Promise<string> {

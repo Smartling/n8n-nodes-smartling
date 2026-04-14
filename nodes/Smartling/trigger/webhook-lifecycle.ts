@@ -38,8 +38,8 @@ export async function webhookCreate(
 
     const subscriptionName = `[Smartling n8n] - ${event}`;
     const body: Record<string, any> = {
-        name: subscriptionName,
-        url: webhookUrl,
+        subscriptionName,
+        subscriptionUrl: webhookUrl,
         events: [{ type: event, schemaVersion: "1.0" }],
     };
     if (projectUids?.length) {
