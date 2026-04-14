@@ -4,16 +4,8 @@ import type {
     INodeExecutionData,
     INodeType,
     INodeTypeDescription,
-    ILoadOptionsFunctions,
-    INodePropertyOptions,
-    INodeListSearchResult,
-    ICredentialTestFunctions,
-    INodeCredentialTestResult,
-    ICredentialsDecrypted,
 } from "n8n-workflow";
 import { NodeConnectionTypes, NodeOperationError } from "n8n-workflow";
-
-import { wrapAndLogError } from "./common/errors";
 
 import { textMtDescription } from "./actions/text-mt/description";
 import { executeTextMt } from "./actions/text-mt/execute";
@@ -23,12 +15,10 @@ import { downloadTranslatedFileDescription } from "./actions/download-translated
 import { executeDownloadTranslatedFile } from "./actions/download-translated-file/execute";
 import { requestTranslationDescription } from "./actions/request-translation/description";
 import { executeRequestTranslation, type RequestTranslationParams } from "./actions/request-translation/execute";
-import { createContext } from "./common/context";
+import { resolveAccountUid } from "./common/smartling-api";
 import { extractResourceLocatorValue } from "./common/utils";
 import { getMtSourceLocales, getMtTargetLocales, getProjectLocales, getProjectWorkflows } from "./methods/load-options";
 import { searchProjects } from "./methods/list-search";
-
-const NODE_VERSION = "0.1.0";
 
 export class Smartling implements INodeType {
     description: INodeTypeDescription = {
@@ -47,7 +37,6 @@ export class Smartling implements INodeType {
             {
                 name: "smartlingApi",
                 required: true,
-                testedBy: "smartlingApiTest",
             },
         ],
         properties: [
@@ -131,34 +120,6 @@ export class Smartling implements INodeType {
     };
 
     methods = {
-        credentialTest: {
-            async smartlingApiTest(
-                this: ICredentialTestFunctions,
-                credential: ICredentialsDecrypted,
-            ): Promise<INodeCredentialTestResult> {
-                try {
-                    const creds = credential.data!;
-                    const ctx = createContext(
-                        {
-                            userIdentifier: creds.userIdentifier as string,
-                            userSecret: creds.userSecret as string,
-                        },
-                        "credentialTest",
-                        NODE_VERSION,
-                    );
-                    await ctx.resolveAccountUid();
-                    return {
-                        status: "OK",
-                        message: "Successfully connected to Smartling",
-                    };
-                } catch (error) {
-                    return {
-                        status: "Error",
-                        message: `Authentication failed: ${(error as Error).message}`,
-                    };
-                }
-            },
-        },
         loadOptions: {
             getMtSourceLocales,
             getMtTargetLocales,
@@ -178,189 +139,164 @@ export class Smartling implements INodeType {
 
         for (let i = 0; i < items.length; i++) {
             try {
-                const credentials = await this.getCredentials("smartlingApi");
-                const ctx = createContext(
-                    {
-                        userIdentifier: credentials.userIdentifier as string,
-                        userSecret: credentials.userSecret as string,
-                    },
-                    `${resource}.${operation}`,
-                    NODE_VERSION,
-                );
+                if (resource === "machineTranslation" && operation === "translateText") {
+                    const accountUid = await resolveAccountUid(this);
+                    const sourceLocale = this.getNodeParameter("sourceLocale", i) as string;
+                    const targetLocale = this.getNodeParameter("targetLocale", i) as string;
+                    const sourceText = this.getNodeParameter("sourceText", i) as string;
 
-                try {
-                    if (resource === "machineTranslation" && operation === "translateText") {
-                        const accountUid = await ctx.resolveAccountUid();
-                        const sourceLocale = this.getNodeParameter("sourceLocale", i) as string;
-                        const targetLocale = this.getNodeParameter("targetLocale", i) as string;
-                        const sourceText = this.getNodeParameter("sourceText", i) as string;
-
-                        const result = await executeTextMt(
-                            ctx,
-                            accountUid,
-                            sourceLocale || undefined,
-                            targetLocale,
-                            sourceText,
-                        );
-
-                        returnData.push({ json: result as IDataObject, pairedItem: i });
-                    } else if (resource === "machineTranslation" && operation === "translateFile") {
-                        const accountUid = await ctx.resolveAccountUid();
-                        const binaryPropertyName = this.getNodeParameter(
-                            "binaryPropertyName",
-                            i,
-                        ) as string;
-                        const fileType = this.getNodeParameter("fileType", i) as string;
-                        const sourceLocale = this.getNodeParameter("sourceLocale", i) as string;
-                        const targetLocales = this.getNodeParameter(
-                            "targetLocales",
-                            i,
-                        ) as string[];
-                        const timeout = this.getNodeParameter("timeout", i) as number;
-                        const pollInterval = this.getNodeParameter("pollInterval", i) as number;
-
-                        const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
-                        const fileBuffer = await this.helpers.getBinaryDataBuffer(
-                            i,
-                            binaryPropertyName,
-                        );
-                        const fileName = binaryData.fileName ?? "file";
-
-                        const result = await executeFileMt(
-                            ctx,
-                            accountUid,
-                            fileBuffer,
-                            fileName,
-                            fileType || undefined,
-                            sourceLocale || undefined,
-                            targetLocales,
-                            timeout,
-                            pollInterval,
-                        );
-
-                        const binary = await this.helpers.prepareBinaryData(
-                            result.content,
-                            result.fileName,
-                            result.contentType,
-                        );
-
-                        returnData.push({
-                            json: result.metadata as IDataObject,
-                            binary: { data: binary },
-                            pairedItem: i,
-                        });
-                    } else if (resource === "file" && operation === "download") {
-                        const projectUid = extractResourceLocatorValue(
-                            this.getNodeParameter("projectUid", i),
-                        );
-                        const fileUri = this.getNodeParameter("fileUri", i) as string;
-                        const targetLocale = this.getNodeParameter("targetLocale", i) as string;
-                        const retrievalType = this.getNodeParameter(
-                            "retrievalType",
-                            i,
-                        ) as string;
-                        const includeOriginalStrings = this.getNodeParameter(
-                            "includeOriginalStrings",
-                            i,
-                        ) as boolean;
-
-                        const result = await executeDownloadTranslatedFile(
-                            ctx,
-                            projectUid,
-                            fileUri,
-                            targetLocale,
-                            retrievalType || undefined,
-                            includeOriginalStrings,
-                        );
-
-                        const binary = await this.helpers.prepareBinaryData(
-                            result.content,
-                            result.fileName,
-                            result.contentType,
-                        );
-
-                        returnData.push({
-                            json: { fileName: result.fileName, contentType: result.contentType },
-                            binary: { data: binary },
-                            pairedItem: i,
-                        });
-                    } else if (resource === "translation" && operation === "requestTranslation") {
-                        const accountUid = await ctx.resolveAccountUid();
-                        const projectUid = extractResourceLocatorValue(
-                            this.getNodeParameter("projectUid", i),
-                        );
-                        const dailyJobType = this.getNodeParameter("dailyJobType", i) as string;
-                        const dailyJobNamePrefix = this.getNodeParameter(
-                            "dailyJobNamePrefix",
-                            i,
-                            "",
-                        ) as string;
-                        const jobReferenceNumber = this.getNodeParameter(
-                            "jobReferenceNumber",
-                            i,
-                            "",
-                        ) as string;
-                        const targetLocales = this.getNodeParameter(
-                            "targetLocales",
-                            i,
-                        ) as string[];
-                        const translationJobAuthorize = this.getNodeParameter(
-                            "translationJobAuthorize",
-                            i,
-                        ) as boolean;
-                        const targetLanguageWorkflow = this.getNodeParameter(
-                            "targetLanguageWorkflow",
-                            i,
-                            "",
-                        ) as string;
-                        const binaryPropertyName = this.getNodeParameter(
-                            "binaryPropertyName",
-                            i,
-                        ) as string;
-                        const fileUri = this.getNodeParameter("fileUri", i) as string;
-                        const fileType = this.getNodeParameter("fileType", i, "") as string;
-
-                        const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
-                        const fileBuffer = await this.helpers.getBinaryDataBuffer(
-                            i,
-                            binaryPropertyName,
-                        );
-                        const fileName = binaryData.fileName ?? "file";
-
-                        const params: RequestTranslationParams = {
-                            projectUid,
-                            accountUid,
-                            dailyJobType,
-                            dailyJobNamePrefix: dailyJobNamePrefix || undefined,
-                            jobReferenceNumber: jobReferenceNumber || undefined,
-                            targetLocales,
-                            translationJobAuthorize,
-                            targetLanguageWorkflow: targetLanguageWorkflow || undefined,
-                            fileBuffer,
-                            fileName,
-                            fileUri,
-                            fileType: fileType || undefined,
-                        };
-
-                        const result = await executeRequestTranslation(ctx, params);
-
-                        returnData.push({ json: result as IDataObject, pairedItem: i });
-                    } else {
-                        throw new NodeOperationError(
-                            this.getNode(),
-                            `Unknown resource/operation: ${resource}/${operation}`,
-                            { itemIndex: i },
-                        );
-                    }
-                } catch (error) {
-                    throw wrapAndLogError(
-                        ctx,
-                        this.getNode(),
-                        error,
-                        `Smartling ${resource}.${operation} failed`,
+                    const result = await executeTextMt(
+                        this,
+                        accountUid,
+                        sourceLocale || undefined,
+                        targetLocale,
+                        sourceText,
                     );
-                } finally {
-                    await ctx.logger.flush();
+
+                    returnData.push({ json: result as IDataObject, pairedItem: i });
+                } else if (resource === "machineTranslation" && operation === "translateFile") {
+                    const accountUid = await resolveAccountUid(this);
+                    const binaryPropertyName = this.getNodeParameter(
+                        "binaryPropertyName",
+                        i,
+                    ) as string;
+                    const fileType = this.getNodeParameter("fileType", i) as string;
+                    const sourceLocale = this.getNodeParameter("sourceLocale", i) as string;
+                    const targetLocales = this.getNodeParameter(
+                        "targetLocales",
+                        i,
+                    ) as string[];
+
+                    const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
+                    const fileBuffer = await this.helpers.getBinaryDataBuffer(
+                        i,
+                        binaryPropertyName,
+                    );
+                    const fileName = binaryData.fileName ?? "file";
+
+                    const result = await executeFileMt(
+                        this,
+                        accountUid,
+                        fileBuffer,
+                        fileName,
+                        fileType || undefined,
+                        sourceLocale || undefined,
+                        targetLocales,
+                    );
+
+                    const binary = await this.helpers.prepareBinaryData(
+                        result.content,
+                        result.fileName,
+                        result.contentType,
+                    );
+
+                    returnData.push({
+                        json: result.metadata as IDataObject,
+                        binary: { data: binary },
+                        pairedItem: i,
+                    });
+                } else if (resource === "file" && operation === "download") {
+                    const projectUid = extractResourceLocatorValue(
+                        this.getNodeParameter("projectUid", i),
+                    );
+                    const fileUri = this.getNodeParameter("fileUri", i) as string;
+                    const targetLocale = this.getNodeParameter("targetLocale", i) as string;
+                    const retrievalType = this.getNodeParameter(
+                        "retrievalType",
+                        i,
+                    ) as string;
+                    const includeOriginalStrings = this.getNodeParameter(
+                        "includeOriginalStrings",
+                        i,
+                    ) as boolean;
+
+                    const result = await executeDownloadTranslatedFile(
+                        this,
+                        projectUid,
+                        fileUri,
+                        targetLocale,
+                        retrievalType || undefined,
+                        includeOriginalStrings,
+                    );
+
+                    const binary = await this.helpers.prepareBinaryData(
+                        result.content,
+                        result.fileName,
+                        result.contentType,
+                    );
+
+                    returnData.push({
+                        json: { fileName: result.fileName, contentType: result.contentType },
+                        binary: { data: binary },
+                        pairedItem: i,
+                    });
+                } else if (resource === "translation" && operation === "requestTranslation") {
+                    const accountUid = await resolveAccountUid(this);
+                    const projectUid = extractResourceLocatorValue(
+                        this.getNodeParameter("projectUid", i),
+                    );
+                    const dailyJobType = this.getNodeParameter("dailyJobType", i) as string;
+                    const dailyJobNamePrefix = this.getNodeParameter(
+                        "dailyJobNamePrefix",
+                        i,
+                        "",
+                    ) as string;
+                    const jobReferenceNumber = this.getNodeParameter(
+                        "jobReferenceNumber",
+                        i,
+                        "",
+                    ) as string;
+                    const targetLocales = this.getNodeParameter(
+                        "targetLocales",
+                        i,
+                    ) as string[];
+                    const translationJobAuthorize = this.getNodeParameter(
+                        "translationJobAuthorize",
+                        i,
+                    ) as boolean;
+                    const targetLanguageWorkflow = this.getNodeParameter(
+                        "targetLanguageWorkflow",
+                        i,
+                        "",
+                    ) as string;
+                    const binaryPropertyName = this.getNodeParameter(
+                        "binaryPropertyName",
+                        i,
+                    ) as string;
+                    const fileUri = this.getNodeParameter("fileUri", i) as string;
+                    const fileType = this.getNodeParameter("fileType", i, "") as string;
+
+                    const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
+                    const fileBuffer = await this.helpers.getBinaryDataBuffer(
+                        i,
+                        binaryPropertyName,
+                    );
+                    const fileName = binaryData.fileName ?? "file";
+
+                    const params: RequestTranslationParams = {
+                        projectUid,
+                        accountUid,
+                        dailyJobType,
+                        dailyJobNamePrefix: dailyJobNamePrefix || undefined,
+                        jobReferenceNumber: jobReferenceNumber || undefined,
+                        targetLocales,
+                        translationJobAuthorize,
+                        targetLanguageWorkflow: targetLanguageWorkflow || undefined,
+                        fileBuffer,
+                        fileName,
+                        fileUri,
+                        fileType: fileType || undefined,
+                    };
+
+                    const result = await executeRequestTranslation(this, params);
+
+                    returnData.push({ json: result as IDataObject, pairedItem: i });
+                } else {
+                    throw new NodeOperationError(
+                        this.getNode(),
+                        `Unknown resource/operation: ${resource}/${operation}`,
+                        { itemIndex: i },
+                    );
                 }
             } catch (error) {
                 if (this.continueOnFail()) {
@@ -369,7 +305,14 @@ export class Smartling implements INodeType {
                         pairedItem: i,
                     });
                 } else {
-                    throw error;
+                    if (error instanceof NodeOperationError) {
+                        throw error;
+                    }
+                    throw new NodeOperationError(
+                        this.getNode(),
+                        (error as Error).message,
+                        { itemIndex: i },
+                    );
                 }
             }
         }
