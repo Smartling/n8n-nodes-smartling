@@ -1,43 +1,24 @@
-import { createHookFunctionsMock, createContextMock } from "../../../test/mocks";
+import { createHookFunctionsMock } from "../../../test/mocks";
 import { webhookCheckExists, webhookCreate, webhookDelete } from "./webhook-lifecycle";
-import { createContext } from "../common/context";
 
-jest.mock("../common/context");
-jest.mock("smartling-api-sdk-nodejs", () => ({
-    ...jest.requireActual("smartling-api-sdk-nodejs"),
-    CreateSubscriptionParameters: jest.fn().mockImplementation(
-        (name: string, url: string, events: unknown[]) => ({
-            subscriptionName: name,
-            subscriptionUrl: url,
-            events,
-            setDescription: jest.fn().mockReturnThis(),
-            setProjectUids: jest.fn().mockReturnThis(),
-            export: jest.fn().mockReturnValue({
-                subscriptionName: name,
-                subscriptionUrl: url,
-                events,
-            }),
-        }),
-    ),
+const mockSmartlingRequest = jest.fn();
+const mockResolveAccountUid = jest.fn().mockResolvedValue("test-account-uid");
+jest.mock("../common/smartling-api", () => ({
+    smartlingRequest: (...args: any[]) => mockSmartlingRequest(...args),
+    resolveAccountUid: (...args: any[]) => mockResolveAccountUid(...args),
 }));
-
-const mockedCreateContext = createContext as jest.MockedFunction<typeof createContext>;
 
 describe("webhook-lifecycle", () => {
     let hookFunctions: ReturnType<typeof createHookFunctionsMock>;
-    let ctxMock: ReturnType<typeof createContextMock>;
 
     beforeEach(() => {
         jest.clearAllMocks();
         hookFunctions = createHookFunctionsMock();
-        ctxMock = createContextMock();
-        mockedCreateContext.mockReturnValue(ctxMock);
     });
 
     describe("webhookCheckExists", () => {
         it("should return true when matching webhook found", async () => {
-            const webhooksApi = ctxMock.getWebhooksApi();
-            (webhooksApi.getSubscriptions as jest.Mock).mockResolvedValue({
+            mockSmartlingRequest.mockResolvedValue({
                 totalCount: 1,
                 items: [
                     {
@@ -59,8 +40,7 @@ describe("webhook-lifecycle", () => {
         });
 
         it("should return false when no matching webhook found", async () => {
-            const webhooksApi = ctxMock.getWebhooksApi();
-            (webhooksApi.getSubscriptions as jest.Mock).mockResolvedValue({
+            mockSmartlingRequest.mockResolvedValue({
                 totalCount: 1,
                 items: [
                     {
@@ -80,8 +60,7 @@ describe("webhook-lifecycle", () => {
         });
 
         it("should return false when no subscriptions exist", async () => {
-            const webhooksApi = ctxMock.getWebhooksApi();
-            (webhooksApi.getSubscriptions as jest.Mock).mockResolvedValue({
+            mockSmartlingRequest.mockResolvedValue({
                 totalCount: 0,
                 items: [],
             });
@@ -95,8 +74,7 @@ describe("webhook-lifecycle", () => {
         });
 
         it("should return false when URL matches but event type differs", async () => {
-            const webhooksApi = ctxMock.getWebhooksApi();
-            (webhooksApi.getSubscriptions as jest.Mock).mockResolvedValue({
+            mockSmartlingRequest.mockResolvedValue({
                 totalCount: 1,
                 items: [
                     {
@@ -117,9 +95,8 @@ describe("webhook-lifecycle", () => {
     });
 
     describe("webhookCreate", () => {
-        it("should call createSubscription and store webhookId", async () => {
-            const webhooksApi = ctxMock.getWebhooksApi();
-            (webhooksApi.createSubscription as jest.Mock).mockResolvedValue({
+        it("should call smartlingRequest POST and store webhookId", async () => {
+            mockSmartlingRequest.mockResolvedValue({
                 subscriptionUid: "new-sub-123",
                 subscriptionUrl: "https://n8n.test/webhook/test-id",
                 events: [{ type: "file.published", schemaVersion: "1.0" }],
@@ -131,26 +108,26 @@ describe("webhook-lifecycle", () => {
             );
 
             expect(result).toBe(true);
-            expect(webhooksApi.createSubscription).toHaveBeenCalledWith(
-                "test-account-uid",
+            expect(mockSmartlingRequest).toHaveBeenCalledWith(
+                hookFunctions,
                 expect.objectContaining({
-                    subscriptionName: "[Smartling n8n] - file.published",
-                    subscriptionUrl: "https://n8n.test/webhook/test-id",
-                    events: [{ type: "file.published", schemaVersion: "1.0" }],
+                    method: "POST",
+                    path: "/webhooks-api/v2/accounts/test-account-uid/subscriptions",
+                    body: expect.objectContaining({
+                        name: "[Smartling n8n] - file.published",
+                        url: "https://n8n.test/webhook/test-id",
+                        events: [{ type: "file.published", schemaVersion: "1.0" }],
+                    }),
                 }),
             );
             const staticData = hookFunctions.getWorkflowStaticData("node");
             expect(staticData.webhookId).toBe("new-sub-123");
         });
 
-        it("should pass projectUids filter when provided", async () => {
-            const webhooksApi = ctxMock.getWebhooksApi();
-            const mockSubscription = {
+        it("should pass projectUids in body when provided", async () => {
+            mockSmartlingRequest.mockResolvedValue({
                 subscriptionUid: "new-sub-456",
-                subscriptionUrl: "https://n8n.test/webhook/test-id",
-                events: [{ type: "file.published", schemaVersion: "1.0" }],
-            };
-            (webhooksApi.createSubscription as jest.Mock).mockResolvedValue(mockSubscription);
+            });
 
             const result = await webhookCreate.call(
                 hookFunctions,
@@ -159,62 +136,73 @@ describe("webhook-lifecycle", () => {
             );
 
             expect(result).toBe(true);
-            const createCall = (webhooksApi.createSubscription as jest.Mock).mock.calls[0];
-            expect(createCall[1].setProjectUids).toHaveBeenCalledWith(["project-1", "project-2"]);
+            expect(mockSmartlingRequest).toHaveBeenCalledWith(
+                hookFunctions,
+                expect.objectContaining({
+                    body: expect.objectContaining({
+                        projectUids: ["project-1", "project-2"],
+                    }),
+                }),
+            );
         });
 
-        it("should not call setProjectUids when projectUids is empty", async () => {
-            const webhooksApi = ctxMock.getWebhooksApi();
-            (webhooksApi.createSubscription as jest.Mock).mockResolvedValue({
+        it("should not include projectUids in body when empty array provided", async () => {
+            mockSmartlingRequest.mockResolvedValue({
                 subscriptionUid: "new-sub-789",
             });
 
             await webhookCreate.call(hookFunctions, "file.published", []);
 
-            const createCall = (webhooksApi.createSubscription as jest.Mock).mock.calls[0];
-            expect(createCall[1].setProjectUids).not.toHaveBeenCalled();
+            expect(mockSmartlingRequest).toHaveBeenCalledWith(
+                hookFunctions,
+                expect.objectContaining({
+                    body: expect.not.objectContaining({
+                        projectUids: expect.anything(),
+                    }),
+                }),
+            );
         });
     });
 
     describe("webhookDelete", () => {
-        it("should call deleteSubscription and clean static data", async () => {
+        it("should call smartlingRequest DELETE and clean static data", async () => {
             const staticData = hookFunctions.getWorkflowStaticData("node");
             staticData.webhookId = "sub-to-delete";
 
-            const webhooksApi = ctxMock.getWebhooksApi();
-            (webhooksApi.deleteSubscription as jest.Mock).mockResolvedValue(undefined);
+            mockSmartlingRequest.mockResolvedValue(undefined);
 
             const result = await webhookDelete.call(hookFunctions);
 
             expect(result).toBe(true);
-            expect(webhooksApi.deleteSubscription).toHaveBeenCalledWith(
-                "test-account-uid",
-                "sub-to-delete",
+            expect(mockSmartlingRequest).toHaveBeenCalledWith(
+                hookFunctions,
+                expect.objectContaining({
+                    method: "DELETE",
+                    path: "/webhooks-api/v2/accounts/test-account-uid/subscriptions/sub-to-delete",
+                }),
             );
             expect(staticData.webhookId).toBeUndefined();
         });
 
-        it("should return false when no webhookId stored", async () => {
+        it("should return true when no webhookId stored", async () => {
             const result = await webhookDelete.call(hookFunctions);
 
-            expect(result).toBe(false);
-            const webhooksApi = ctxMock.getWebhooksApi();
-            expect(webhooksApi.deleteSubscription).not.toHaveBeenCalled();
+            expect(result).toBe(true);
+            expect(mockSmartlingRequest).not.toHaveBeenCalled();
         });
 
-        it("should return false on API error without throwing", async () => {
+        it("should return true on API error without throwing and clean static data", async () => {
             const staticData = hookFunctions.getWorkflowStaticData("node");
             staticData.webhookId = "sub-to-delete";
 
-            const webhooksApi = ctxMock.getWebhooksApi();
-            (webhooksApi.deleteSubscription as jest.Mock).mockRejectedValue(
+            mockSmartlingRequest.mockRejectedValue(
                 new Error("API Error: Not Found"),
             );
 
             const result = await webhookDelete.call(hookFunctions);
 
-            expect(result).toBe(false);
-            expect(staticData.webhookId).toBe("sub-to-delete");
+            expect(result).toBe(true);
+            expect(staticData.webhookId).toBeUndefined();
         });
     });
 });
