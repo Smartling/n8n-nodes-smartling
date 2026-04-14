@@ -1,47 +1,33 @@
-jest.mock("../common/context");
+const mockSmartlingRequest = jest.fn();
+const mockResolveAccountUid = jest.fn().mockResolvedValue("acc-456");
+jest.mock("../common/smartling-api", () => ({
+    smartlingRequest: (...args: any[]) => mockSmartlingRequest(...args),
+    resolveAccountUid: (...args: any[]) => mockResolveAccountUid(...args),
+}));
 
 import { searchProjects } from "./list-search";
-import { createContext } from "../common/context";
-
-const mockCreateContext = createContext as jest.MockedFunction<typeof createContext>;
-
-const mockFlush = jest.fn().mockResolvedValue(undefined);
-
-const createMockContext = (apiOverrides: Record<string, unknown> = {}) => ({
-    logger: { flush: mockFlush },
-    ...apiOverrides,
-});
 
 const bindThis = (fn: Function) =>
     fn.bind({
-        getCredentials: jest.fn().mockResolvedValue({
-            userIdentifier: "test-user",
-            userSecret: "test-secret",
-        }),
         getCurrentNodeParameter: jest.fn(),
+        helpers: {
+            httpRequestWithAuthentication: jest.fn(),
+        },
     });
 
 describe("searchProjects", () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockResolveAccountUid.mockResolvedValue("acc-456");
     });
 
     it("should return projects list", async () => {
-        const mockProjectsApi = {
-            listProjects: jest.fn().mockResolvedValue({
-                items: [
-                    { projectId: "p1", projectName: "Project One" },
-                    { projectId: "p2", projectName: "Project Two" },
-                ],
-            }),
-        };
-
-        mockCreateContext.mockReturnValue(
-            createMockContext({
-                getProjectsApi: () => mockProjectsApi,
-                resolveAccountUid: jest.fn().mockResolvedValue("acc-456"),
-            }) as any,
-        );
+        mockSmartlingRequest.mockResolvedValue({
+            items: [
+                { projectId: "p1", projectName: "Project One" },
+                { projectId: "p2", projectName: "Project Two" },
+            ],
+        });
 
         const result = await bindThis(searchProjects)();
 
@@ -52,33 +38,33 @@ describe("searchProjects", () => {
             ],
             paginationToken: undefined,
         });
-        expect(mockFlush).toHaveBeenCalledTimes(1);
+        expect(mockResolveAccountUid).toHaveBeenCalled();
+        expect(mockSmartlingRequest).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                method: "GET",
+                path: "/accounts-api/v2/accounts/acc-456/projects",
+            })
+        );
     });
 
-    it("should pass filter to API via setProjectNameFilter", async () => {
-        const mockProjectsApi = {
-            listProjects: jest.fn().mockResolvedValue({
-                items: [
-                    { projectId: "p1", projectName: "Filtered Project" },
-                ],
-            }),
-        };
-
-        mockCreateContext.mockReturnValue(
-            createMockContext({
-                getProjectsApi: () => mockProjectsApi,
-                resolveAccountUid: jest.fn().mockResolvedValue("acc-456"),
-            }) as any,
-        );
+    it("should pass filter to API via projectNameFilter query param", async () => {
+        mockSmartlingRequest.mockResolvedValue({
+            items: [
+                { projectId: "p1", projectName: "Filtered Project" },
+            ],
+        });
 
         const result = await bindThis(searchProjects)("Filtered");
 
         expect(result.results).toEqual([
             { name: "Filtered Project", value: "p1" },
         ]);
-        expect(mockProjectsApi.listProjects).toHaveBeenCalledWith(
-            "acc-456",
+        expect(mockSmartlingRequest).toHaveBeenCalledWith(
             expect.anything(),
+            expect.objectContaining({
+                qs: expect.objectContaining({ projectNameFilter: "Filtered" }),
+            })
         );
     });
 
@@ -88,16 +74,7 @@ describe("searchProjects", () => {
             projectName: `Project ${i}`,
         }));
 
-        const mockProjectsApi = {
-            listProjects: jest.fn().mockResolvedValue({ items }),
-        };
-
-        mockCreateContext.mockReturnValue(
-            createMockContext({
-                getProjectsApi: () => mockProjectsApi,
-                resolveAccountUid: jest.fn().mockResolvedValue("acc-456"),
-            }) as any,
-        );
+        mockSmartlingRequest.mockResolvedValue({ items });
 
         const result = await bindThis(searchProjects)(undefined, "0");
 
@@ -106,22 +83,12 @@ describe("searchProjects", () => {
     });
 
     it("should return no pagination token when fewer results than page size", async () => {
-        const mockProjectsApi = {
-            listProjects: jest.fn().mockResolvedValue({
-                items: [{ projectId: "p1", projectName: "Only One" }],
-            }),
-        };
-
-        mockCreateContext.mockReturnValue(
-            createMockContext({
-                getProjectsApi: () => mockProjectsApi,
-                resolveAccountUid: jest.fn().mockResolvedValue("acc-456"),
-            }) as any,
-        );
+        mockSmartlingRequest.mockResolvedValue({
+            items: [{ projectId: "p1", projectName: "Only One" }],
+        });
 
         const result = await bindThis(searchProjects)();
 
         expect(result.paginationToken).toBeUndefined();
     });
-
 });

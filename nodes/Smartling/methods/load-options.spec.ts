@@ -1,53 +1,45 @@
-jest.mock("../common/context");
+const mockSmartlingRequest = jest.fn();
+const mockResolveAccountUid = jest.fn().mockResolvedValue("test-account-uid");
+jest.mock("../common/smartling-api", () => ({
+    smartlingRequest: (...args: any[]) => mockSmartlingRequest(...args),
+    resolveAccountUid: (...args: any[]) => mockResolveAccountUid(...args),
+}));
 
 import { getMtSourceLocales, getMtTargetLocales, getProjectLocales, getProjectWorkflows } from "./load-options";
-import { createContext } from "../common/context";
 
-const mockCreateContext = createContext as jest.MockedFunction<typeof createContext>;
-
-const mockFlush = jest.fn().mockResolvedValue(undefined);
-
-const createMockContext = (apiOverrides: Record<string, unknown> = {}) => ({
-    logger: { flush: mockFlush },
-    ...apiOverrides,
-});
-
-const bindThis = (fn: Function, overrides: Record<string, unknown> = {}) =>
+const bindThis = (fn: Function, paramOverrides: Record<string, unknown> = {}) =>
     fn.bind({
-        getCredentials: jest.fn().mockResolvedValue({
-            userIdentifier: "test-user",
-            userSecret: "test-secret",
-        }),
         getCurrentNodeParameter: jest.fn().mockImplementation((name: string) => {
             const params: Record<string, unknown> = {
                 projectUid: { __rl: true, value: "proj-123", mode: "list", cachedResultName: "Test Project" },
                 accountUid: "acc-456",
-                ...overrides,
+                ...paramOverrides,
             };
             return params[name];
         }),
+        helpers: {
+            httpRequestWithAuthentication: jest.fn(),
+        },
     });
 
-const mockLocalesApi = {
-    getLocales: jest.fn().mockResolvedValue({
-        items: [
-            {
-                localeId: "en-US",
-                mtSupported: true,
-                language: { description: "English (United States)" },
-            },
-            {
-                localeId: "fr-FR",
-                mtSupported: true,
-                language: { description: "French (France)" },
-            },
-            {
-                localeId: "xx-XX",
-                mtSupported: false,
-                language: { description: "Unsupported" },
-            },
-        ],
-    }),
+const mockLocalesResponse = {
+    items: [
+        {
+            localeId: "en-US",
+            mtSupported: true,
+            language: { description: "English (United States)" },
+        },
+        {
+            localeId: "fr-FR",
+            mtSupported: true,
+            language: { description: "French (France)" },
+        },
+        {
+            localeId: "xx-XX",
+            mtSupported: false,
+            language: { description: "Unsupported" },
+        },
+    ],
 };
 
 const expectedMtLocales = [
@@ -61,9 +53,7 @@ describe("getMtSourceLocales", () => {
     });
 
     it("should return Auto-Detect followed by MT-supported locales", async () => {
-        mockCreateContext.mockReturnValue(
-            createMockContext({ getLocalesApi: () => mockLocalesApi }) as any,
-        );
+        mockSmartlingRequest.mockResolvedValue(mockLocalesResponse);
 
         const result = await bindThis(getMtSourceLocales)();
 
@@ -71,7 +61,10 @@ describe("getMtSourceLocales", () => {
             { name: "Auto-Detect", value: "" },
             ...expectedMtLocales,
         ]);
-        expect(mockFlush).toHaveBeenCalledTimes(1);
+        expect(mockSmartlingRequest).toHaveBeenCalledWith(
+            expect.anything(),
+            { method: "GET", path: "/locales-api/v2/dictionary/locales" }
+        );
     });
 });
 
@@ -81,14 +74,15 @@ describe("getMtTargetLocales", () => {
     });
 
     it("should return MT-supported locales without Auto-Detect", async () => {
-        mockCreateContext.mockReturnValue(
-            createMockContext({ getLocalesApi: () => mockLocalesApi }) as any,
-        );
+        mockSmartlingRequest.mockResolvedValue(mockLocalesResponse);
 
         const result = await bindThis(getMtTargetLocales)();
 
         expect(result).toEqual(expectedMtLocales);
-        expect(mockFlush).toHaveBeenCalledTimes(1);
+        expect(mockSmartlingRequest).toHaveBeenCalledWith(
+            expect.anything(),
+            { method: "GET", path: "/locales-api/v2/dictionary/locales" }
+        );
     });
 });
 
@@ -98,19 +92,13 @@ describe("getProjectLocales", () => {
     });
 
     it("should return enabled project locales", async () => {
-        const mockProjectsApi = {
-            getProjectDetails: jest.fn().mockResolvedValue({
-                targetLocales: [
-                    { localeId: "de-DE", description: "German (Germany)", enabled: true },
-                    { localeId: "ja-JP", description: "Japanese", enabled: true },
-                    { localeId: "ko-KR", description: "Korean", enabled: false },
-                ],
-            }),
-        };
-
-        mockCreateContext.mockReturnValue(
-            createMockContext({ getProjectsApi: () => mockProjectsApi }) as any,
-        );
+        mockSmartlingRequest.mockResolvedValue({
+            targetLocales: [
+                { localeId: "de-DE", description: "German (Germany)", enabled: true },
+                { localeId: "ja-JP", description: "Japanese", enabled: true },
+                { localeId: "ko-KR", description: "Korean", enabled: false },
+            ],
+        });
 
         const result = await bindThis(getProjectLocales)();
 
@@ -118,15 +106,17 @@ describe("getProjectLocales", () => {
             { name: "German (Germany) (de-DE)", value: "de-DE" },
             { name: "Japanese (ja-JP)", value: "ja-JP" },
         ]);
-        expect(mockProjectsApi.getProjectDetails).toHaveBeenCalledWith("proj-123");
-        expect(mockFlush).toHaveBeenCalledTimes(1);
+        expect(mockSmartlingRequest).toHaveBeenCalledWith(
+            expect.anything(),
+            { method: "GET", path: "/projects-api/v2/projects/proj-123" }
+        );
     });
 
     it("should return empty array when no projectUid", async () => {
         const result = await bindThis(getProjectLocales, { projectUid: "" })();
 
         expect(result).toEqual([]);
-        expect(mockCreateContext).not.toHaveBeenCalled();
+        expect(mockSmartlingRequest).not.toHaveBeenCalled();
     });
 });
 
@@ -136,23 +126,12 @@ describe("getProjectWorkflows", () => {
     });
 
     it("should return workflows for the project", async () => {
-        const mockWorkflowsApi = {
-            searchWorkflows: jest.fn().mockResolvedValue({
-                items: [
-                    { workflowUid: "wf-1", workflowName: "Translation" },
-                    { workflowUid: "wf-2", workflowName: "Review" },
-                ],
-            }),
-        };
-
-        const mockResolveAccountUid = jest.fn().mockResolvedValue("acc-456");
-
-        mockCreateContext.mockReturnValue(
-            createMockContext({
-                getWorkflowsApi: () => mockWorkflowsApi,
-                resolveAccountUid: mockResolveAccountUid,
-            }) as any,
-        );
+        mockSmartlingRequest.mockResolvedValue({
+            items: [
+                { workflowUid: "wf-1", workflowName: "Translation" },
+                { workflowUid: "wf-2", workflowName: "Review" },
+            ],
+        });
 
         const result = await bindThis(getProjectWorkflows)();
 
@@ -161,17 +140,21 @@ describe("getProjectWorkflows", () => {
             { name: "Review", value: "wf-2" },
         ]);
         expect(mockResolveAccountUid).toHaveBeenCalled();
-        expect(mockWorkflowsApi.searchWorkflows).toHaveBeenCalledWith(
-            "acc-456",
+        expect(mockSmartlingRequest).toHaveBeenCalledWith(
             expect.anything(),
+            {
+                method: "POST",
+                path: "/workflows-api/v3/accounts/test-account-uid/workflows",
+                body: { projectId: "proj-123" },
+            }
         );
-        expect(mockFlush).toHaveBeenCalledTimes(1);
     });
 
     it("should return empty array when no projectUid", async () => {
         const result = await bindThis(getProjectWorkflows, { projectUid: "" })();
 
         expect(result).toEqual([]);
-        expect(mockCreateContext).not.toHaveBeenCalled();
+        expect(mockSmartlingRequest).not.toHaveBeenCalled();
+        expect(mockResolveAccountUid).not.toHaveBeenCalled();
     });
 });

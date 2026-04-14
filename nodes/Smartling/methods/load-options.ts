@@ -1,35 +1,18 @@
 import type { ILoadOptionsFunctions, INodePropertyOptions } from "n8n-workflow";
-import { createContext } from "../common/context";
-import type { SmartlingCredentials } from "../common/api";
-import { ListProjectsParameters } from "smartling-api-sdk-nodejs";
-import { WorkflowSearchParameters } from "../common/api/workflows-api";
+import { smartlingRequest, resolveAccountUid } from "../common/smartling-api";
 import { extractResourceLocatorValue } from "../common/utils";
 
-const getCredentials = async (self: ILoadOptionsFunctions): Promise<SmartlingCredentials> => {
-    const creds = await self.getCredentials("smartlingApi");
-    return {
-        userIdentifier: creds.userIdentifier as string,
-        userSecret: creds.userSecret as string,
-    };
-};
-
-const getVersion = (): string => "0.1.0";
-
 async function fetchMtLocales(self: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
-    const credentials = await getCredentials(self);
-    const ctx = createContext(credentials, "getMtLocales", getVersion());
-    try {
-        const localesApi = ctx.getLocalesApi();
-        const response = await localesApi.getLocales();
-        return response.items
-            .filter((locale) => locale.mtSupported)
-            .map((locale) => ({
-                name: `${locale.language.description} (${locale.localeId})`,
-                value: locale.localeId,
-            }));
-    } finally {
-        await ctx.logger.flush();
-    }
+    const response = await smartlingRequest(self, {
+        method: "GET",
+        path: "/locales-api/v2/dictionary/locales",
+    });
+    return (response.items ?? response)
+        .filter((locale: any) => locale.mtSupported)
+        .map((locale: any) => ({
+            name: `${locale.language.description} (${locale.localeId})`,
+            value: locale.localeId,
+        }));
 }
 
 export async function getMtSourceLocales(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
@@ -42,39 +25,35 @@ export async function getMtTargetLocales(this: ILoadOptionsFunctions): Promise<I
 }
 
 export async function getProjectLocales(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
-    const credentials = await getCredentials(this);
     const projectUid = extractResourceLocatorValue(this.getCurrentNodeParameter("projectUid"));
     if (!projectUid) return [];
-    const ctx = createContext(credentials, "getProjectLocales", getVersion());
-    try {
-        const projectsApi = ctx.getProjectsApi();
-        const project = await projectsApi.getProjectDetails(projectUid);
-        return project.targetLocales
-            .filter((locale) => locale.enabled)
-            .map((locale) => ({
-                name: `${locale.description} (${locale.localeId})`,
-                value: locale.localeId,
-            }));
-    } finally {
-        await ctx.logger.flush();
-    }
+
+    const project = await smartlingRequest(this, {
+        method: "GET",
+        path: `/projects-api/v2/projects/${projectUid}`,
+    });
+
+    return (project.targetLocales ?? [])
+        .filter((locale: any) => locale.enabled)
+        .map((locale: any) => ({
+            name: `${locale.description} (${locale.localeId})`,
+            value: locale.localeId,
+        }));
 }
 
 export async function getProjectWorkflows(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
-    const credentials = await getCredentials(this);
     const projectUid = extractResourceLocatorValue(this.getCurrentNodeParameter("projectUid"));
     if (!projectUid) return [];
-    const ctx = createContext(credentials, "getProjectWorkflows", getVersion());
-    try {
-        const accountUid = await ctx.resolveAccountUid();
-        const workflowsApi = ctx.getWorkflowsApi();
-        const params = new WorkflowSearchParameters().setProjectId(projectUid);
-        const response = await workflowsApi.searchWorkflows(accountUid, params);
-        return response.items.map((workflow: any) => ({
-            name: workflow.workflowName,
-            value: workflow.workflowUid,
-        }));
-    } finally {
-        await ctx.logger.flush();
-    }
+
+    const accountUid = await resolveAccountUid(this);
+    const response = await smartlingRequest(this, {
+        method: "POST",
+        path: `/workflows-api/v3/accounts/${accountUid}/workflows`,
+        body: { projectId: projectUid },
+    });
+
+    return (response.items ?? []).map((workflow: any) => ({
+        name: workflow.workflowName,
+        value: workflow.workflowUid,
+    }));
 }
