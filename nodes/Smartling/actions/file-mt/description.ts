@@ -92,33 +92,5 @@ export const fileMtDescription: INodeProperties[] = [
                 operation: ["translateFile"]
             }
         }
-    },
-    {
-        displayName: "Timeout",
-        name: "timeout",
-        type: "number",
-        default: 300,
-        required: false,
-        description: "Max seconds to wait for translation",
-        displayOptions: {
-            show: {
-                resource: ["machineTranslation"],
-                operation: ["translateFile"]
-            }
-        }
-    },
-    {
-        displayName: "Poll Interval",
-        name: "pollInterval",
-        type: "number",
-        default: 3,
-        required: false,
-        description: "Seconds between progress checks",
-        displayOptions: {
-            show: {
-                resource: ["machineTranslation"],
-                operation: ["translateFile"]
-            }
-        }
     }
 ];

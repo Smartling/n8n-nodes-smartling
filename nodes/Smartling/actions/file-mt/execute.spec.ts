@@ -1,114 +1,146 @@
-import {
-    FtsUploadFileParameters,
-    TranslateFileParameters,
-    LanguageDetectionState,
-    MTState,
-    SmartlingFileTranslationsApi
-} from "smartling-api-sdk-nodejs";
-import { Context } from "../../common/context";
-import { createContextMock } from "../../../../test/mocks";
 import { executeFileMt } from "./execute";
+
+jest.mock("../../common/smartling-api", () => ({
+    smartlingRequest: jest.fn()
+}));
 
 jest.mock("../../common/files/file-type", () => ({
     detectFileType: jest.fn().mockResolvedValue("plain_text")
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
+const { smartlingRequest } = require("../../common/smartling-api");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { detectFileType } = require("../../common/files/file-type");
 
+const accountUid = "test-account-uid";
+const fileBuffer = Buffer.from("test file content");
+const fileName = "test-file.txt";
+const fileUid = "test-file-uid";
+const mtUid = "test-mt-uid";
+
+const context = { helpers: {} };
+
+function mockSmartlingRequest(overrides: Record<string, any> = {}) {
+    smartlingRequest.mockImplementation((_ctx: any, opts: any) => {
+        const path: string = opts.path;
+
+        // Upload file
+        if (path.endsWith("/files") && opts.method === "POST") {
+            return Promise.resolve(overrides["upload"] ?? { fileUid });
+        }
+
+        // Start language detection
+        if (path.includes("/language-detection") && opts.method === "POST") {
+            return Promise.resolve(overrides["langDetectStart"] ?? { languageDetectionUid: "lang-det-uid" });
+        }
+
+        // Language detection status
+        if (path.includes("/language-detection/") && path.includes("/status")) {
+            return Promise.resolve(overrides["langDetectStatus"] ?? {
+                state: "COMPLETED",
+                detectedSourceLanguages: [{ defaultLocaleId: "en-US" }]
+            });
+        }
+
+        // Start translation
+        if (path.includes("/mt") && opts.method === "POST" && !path.includes("/status")) {
+            return Promise.resolve(overrides["translateStart"] ?? { mtUid });
+        }
+
+        // Translation status
+        if (path.includes("/mt/") && path.endsWith("/status")) {
+            return Promise.resolve(overrides["translateStatus"] ?? { state: "COMPLETED" });
+        }
+
+        // Download file
+        if (path.includes("/mt/") && path.includes("/file")) {
+            return Promise.resolve(overrides["download"] ?? {
+                body: Buffer.from("translated content"),
+                headers: {
+                    "content-disposition": 'attachment; filename="translated-file.txt"',
+                    "content-type": "text/plain"
+                }
+            });
+        }
+
+        return Promise.resolve({});
+    });
+}
+
 describe("executeFileMt", () => {
-    let contextMock: Context;
-    let fileTranslationsApiMock: jest.Mocked<Pick<
-        SmartlingFileTranslationsApi,
-        "uploadFile" | "translateFile" | "getTranslationProgress" |
-        "downloadTranslatedFileWithMetadata" | "downloadTranslatedFilesWithMetadata" |
-        "detectFileLanguage" | "getLanguageDetectionProgress"
-    >>;
-
-    const accountUid = "test-account-uid";
-    const fileBuffer = Buffer.from("test file content");
-    const fileName = "test-file.txt";
-    const fileUid = "test-file-uid";
-    const mtUid = "test-mt-uid";
-
     beforeEach(() => {
         jest.clearAllMocks();
-        contextMock = createContextMock();
-        fileTranslationsApiMock = contextMock.getFileTranslationsApi() as any;
-
-        fileTranslationsApiMock.uploadFile = jest.fn().mockResolvedValue({ fileUid });
-        fileTranslationsApiMock.translateFile = jest.fn().mockResolvedValue({ mtUid });
-        fileTranslationsApiMock.getTranslationProgress = jest.fn().mockResolvedValue({
-            state: MTState.COMPLETED,
-            requestedStringCount: 10,
-            localeProcessStatuses: []
-        });
-        fileTranslationsApiMock.downloadTranslatedFileWithMetadata = jest.fn().mockResolvedValue({
-            fileName: "translated-file.txt",
-            fileContent: "translated content",
-            contentType: "text/plain"
-        });
-        fileTranslationsApiMock.downloadTranslatedFilesWithMetadata = jest.fn().mockResolvedValue({
-            fileName: "translations.zip",
-            fileContent: "zip content",
-            contentType: "application/zip"
-        });
     });
 
-    test("full flow: upload -> detect locale -> translate -> poll -> download (single locale)", async () => {
-        fileTranslationsApiMock.detectFileLanguage = jest.fn().mockResolvedValue({
-            languageDetectionUid: "lang-det-uid"
-        });
-        fileTranslationsApiMock.getLanguageDetectionProgress = jest.fn().mockResolvedValue({
-            state: LanguageDetectionState.COMPLETED,
-            detectedSourceLanguages: [{ defaultLocaleId: "en-US" }]
-        });
+    test("full flow: upload -> detect locale -> translate -> check status -> download (single locale)", async () => {
+        mockSmartlingRequest();
 
         const result = await executeFileMt(
-            contextMock,
+            context,
             accountUid,
             fileBuffer,
             fileName,
             undefined,
             undefined,
-            ["fr-FR"],
-            300,
-            1
+            ["fr-FR"]
         );
 
-        // Verify upload
-        expect(fileTranslationsApiMock.uploadFile).toHaveBeenCalledWith(
-            accountUid,
-            expect.any(FtsUploadFileParameters)
+        // Verify upload was called
+        expect(smartlingRequest).toHaveBeenCalledWith(
+            context,
+            expect.objectContaining({
+                method: "POST",
+                path: `/file-translations-api/v2/accounts/${accountUid}/files`
+            })
         );
 
-        // Verify language detection
-        expect(fileTranslationsApiMock.detectFileLanguage).toHaveBeenCalledWith(
-            accountUid, fileUid
-        );
-        expect(fileTranslationsApiMock.getLanguageDetectionProgress).toHaveBeenCalledWith(
-            accountUid, fileUid, "lang-det-uid"
-        );
-
-        // Verify translation
-        expect(fileTranslationsApiMock.translateFile).toHaveBeenCalledWith(
-            accountUid,
-            fileUid,
-            expect.any(TranslateFileParameters)
+        // Verify language detection start
+        expect(smartlingRequest).toHaveBeenCalledWith(
+            context,
+            expect.objectContaining({
+                method: "POST",
+                path: `/file-translations-api/v2/accounts/${accountUid}/files/${fileUid}/language-detection`
+            })
         );
 
-        // Verify polling
-        expect(fileTranslationsApiMock.getTranslationProgress).toHaveBeenCalledWith(
-            accountUid, fileUid, mtUid
+        // Verify language detection status
+        expect(smartlingRequest).toHaveBeenCalledWith(
+            context,
+            expect.objectContaining({
+                method: "GET",
+                path: `/file-translations-api/v2/accounts/${accountUid}/files/${fileUid}/language-detection/lang-det-uid/status`
+            })
         );
 
-        // Verify download (single locale)
-        expect(fileTranslationsApiMock.downloadTranslatedFileWithMetadata).toHaveBeenCalledWith(
-            accountUid, fileUid, mtUid, "fr-FR"
+        // Verify translation start
+        expect(smartlingRequest).toHaveBeenCalledWith(
+            context,
+            expect.objectContaining({
+                method: "POST",
+                path: `/file-translations-api/v2/accounts/${accountUid}/files/${fileUid}/mt`,
+                body: { sourceLocaleId: "en-US", targetLocaleIds: ["fr-FR"] }
+            })
         );
-        expect(fileTranslationsApiMock.downloadTranslatedFilesWithMetadata).not.toHaveBeenCalled();
 
-        // Verify result
+        // Verify status check
+        expect(smartlingRequest).toHaveBeenCalledWith(
+            context,
+            expect.objectContaining({
+                method: "GET",
+                path: `/file-translations-api/v2/accounts/${accountUid}/files/${fileUid}/mt/${mtUid}/status`
+            })
+        );
+
+        // Verify single locale download
+        expect(smartlingRequest).toHaveBeenCalledWith(
+            context,
+            expect.objectContaining({
+                method: "GET",
+                path: `/file-translations-api/v2/accounts/${accountUid}/files/${fileUid}/mt/${mtUid}/locales/fr-FR/file`
+            })
+        );
+
         expect(result).toEqual({
             content: Buffer.from("translated content"),
             fileName: "translated-file.txt",
@@ -125,31 +157,34 @@ describe("executeFileMt", () => {
     });
 
     test("full flow with multiple locales (ZIP download)", async () => {
-        fileTranslationsApiMock.detectFileLanguage = jest.fn().mockResolvedValue({
-            languageDetectionUid: "lang-det-uid"
-        });
-        fileTranslationsApiMock.getLanguageDetectionProgress = jest.fn().mockResolvedValue({
-            state: LanguageDetectionState.COMPLETED,
-            detectedSourceLanguages: [{ defaultLocaleId: "en-US" }]
+        mockSmartlingRequest({
+            download: {
+                body: Buffer.from("zip content"),
+                headers: {
+                    "content-disposition": 'attachment; filename="translations.zip"',
+                    "content-type": "application/zip"
+                }
+            }
         });
 
         const result = await executeFileMt(
-            contextMock,
+            context,
             accountUid,
             fileBuffer,
             fileName,
             undefined,
             undefined,
-            ["fr-FR", "es-ES"],
-            300,
-            1
+            ["fr-FR", "es-ES"]
         );
 
-        // Verify ZIP download for multiple locales
-        expect(fileTranslationsApiMock.downloadTranslatedFilesWithMetadata).toHaveBeenCalledWith(
-            accountUid, fileUid, mtUid
+        // Verify ZIP download path
+        expect(smartlingRequest).toHaveBeenCalledWith(
+            context,
+            expect.objectContaining({
+                method: "GET",
+                path: `/file-translations-api/v2/accounts/${accountUid}/files/${fileUid}/mt/${mtUid}/locales/all/file/zip`
+            })
         );
-        expect(fileTranslationsApiMock.downloadTranslatedFileWithMetadata).not.toHaveBeenCalled();
 
         expect(result).toEqual({
             content: Buffer.from("zip content"),
@@ -167,143 +202,128 @@ describe("executeFileMt", () => {
     });
 
     test("file type auto-detection", async () => {
+        mockSmartlingRequest();
+
         const result = await executeFileMt(
-            contextMock,
+            context,
             accountUid,
             fileBuffer,
             fileName,
             undefined,
             "en-US",
-            ["fr-FR"],
-            300,
-            1
+            ["fr-FR"]
         );
 
         expect(detectFileType).toHaveBeenCalledWith(
-            contextMock.logger,
-            { fileName, content: fileBuffer },
-            contextMock.getFileTypeApi()
+            context,
+            { fileName, content: fileBuffer }
         );
 
         expect(result.content).toEqual(Buffer.from("translated content"));
     });
 
+    test("file type provided (skip detection)", async () => {
+        mockSmartlingRequest();
+
+        await executeFileMt(
+            context,
+            accountUid,
+            fileBuffer,
+            fileName,
+            "html",
+            "en-US",
+            ["fr-FR"]
+        );
+
+        expect(detectFileType).not.toHaveBeenCalled();
+    });
+
+    test("source locale provided (skip language detection)", async () => {
+        mockSmartlingRequest();
+
+        await executeFileMt(
+            context,
+            accountUid,
+            fileBuffer,
+            fileName,
+            "html",
+            "en-US",
+            ["fr-FR"]
+        );
+
+        // Should not call language detection endpoints
+        const calls = smartlingRequest.mock.calls;
+        const langDetectCalls = calls.filter((c: any) =>
+            (c[1].path as string).includes("/language-detection")
+        );
+        expect(langDetectCalls).toHaveLength(0);
+    });
+
     test("source locale auto-detection", async () => {
-        fileTranslationsApiMock.detectFileLanguage = jest.fn().mockResolvedValue({
-            languageDetectionUid: "lang-det-uid"
-        });
-        fileTranslationsApiMock.getLanguageDetectionProgress = jest.fn().mockResolvedValue({
-            state: LanguageDetectionState.COMPLETED,
-            detectedSourceLanguages: [{ defaultLocaleId: "de-DE" }]
+        mockSmartlingRequest({
+            langDetectStatus: {
+                state: "COMPLETED",
+                detectedSourceLanguages: [{ defaultLocaleId: "de-DE" }]
+            }
         });
 
         await executeFileMt(
-            contextMock,
+            context,
             accountUid,
             fileBuffer,
             fileName,
             "html",
             undefined,
-            ["fr-FR"],
-            300,
-            1
+            ["fr-FR"]
         );
 
-        expect(fileTranslationsApiMock.detectFileLanguage).toHaveBeenCalledWith(
-            accountUid, fileUid
-        );
-        expect(contextMock.logger.info).toHaveBeenCalledWith(
-            "Language detected.",
-            expect.objectContaining({ sourceLocaleId: "de-DE" })
+        // Verify translation used the detected locale
+        expect(smartlingRequest).toHaveBeenCalledWith(
+            context,
+            expect.objectContaining({
+                body: { sourceLocaleId: "de-DE", targetLocaleIds: ["fr-FR"] }
+            })
         );
     });
 
-    test("source locale provided (skip detection)", async () => {
-        await executeFileMt(
-            contextMock,
-            accountUid,
-            fileBuffer,
-            fileName,
-            "html",
-            "en-US",
-            ["fr-FR"],
-            300,
-            1
-        );
-
-        expect(fileTranslationsApiMock.detectFileLanguage).not.toHaveBeenCalled();
-        expect(fileTranslationsApiMock.getLanguageDetectionProgress).not.toHaveBeenCalled();
-    });
-
-    test("file type provided (skip detection)", async () => {
-        await executeFileMt(
-            contextMock,
-            accountUid,
-            fileBuffer,
-            fileName,
-            "html",
-            "en-US",
-            ["fr-FR"],
-            300,
-            1
-        );
-
-        expect(detectFileType).not.toHaveBeenCalled();
-        expect(contextMock.logger.debug).toHaveBeenCalledWith(
-            "Using provided file type.",
-            { fileType: "html" }
-        );
-    });
-
-    test("poll timeout returns last result with non-completed state", async () => {
-        fileTranslationsApiMock.getTranslationProgress = jest.fn().mockResolvedValue({
-            state: MTState.PROCESSING,
-            requestedStringCount: 10,
-            localeProcessStatuses: []
+    test("translation in progress returns metadata", async () => {
+        mockSmartlingRequest({
+            translateStatus: { state: "PROCESSING" }
         });
 
-        await expect(
-            executeFileMt(
-                contextMock,
-                accountUid,
-                fileBuffer,
-                fileName,
-                "html",
-                "en-US",
-                ["fr-FR"],
-                0.001,
-                0.001
-            )
-        ).rejects.toThrow("File translation did not complete within");
-    });
+        const result = await executeFileMt(
+            context,
+            accountUid,
+            fileBuffer,
+            fileName,
+            "html",
+            "en-US",
+            ["fr-FR"]
+        );
 
-    test("error during upload", async () => {
-        const uploadError = new Error("Upload failed");
-        fileTranslationsApiMock.uploadFile = jest.fn().mockRejectedValue(uploadError);
-
-        await expect(
-            executeFileMt(
-                contextMock,
-                accountUid,
-                fileBuffer,
-                fileName,
-                "html",
-                "en-US",
-                ["fr-FR"]
-            )
-        ).rejects.toThrow("Upload failed");
+        expect(result.content).toEqual(Buffer.alloc(0));
+        expect(result.fileName).toBe("");
+        expect(result.contentType).toBe("");
+        expect(result.metadata).toEqual({
+            fileUid,
+            mtUid,
+            targetLocales: ["fr-FR"],
+            state: "PROCESSING",
+            message: "Translation is still in progress. Use the fileUid and mtUid to check status or download later.",
+            fullFileName: fileName,
+            fileName: "test-file",
+            fileExtension: ".txt"
+        });
     });
 
     test("translation fails with FAILED state", async () => {
-        fileTranslationsApiMock.getTranslationProgress = jest.fn().mockResolvedValue({
-            state: MTState.FAILED,
-            requestedStringCount: 0,
-            localeProcessStatuses: []
+        mockSmartlingRequest({
+            translateStatus: { state: "FAILED" }
         });
 
         await expect(
             executeFileMt(
-                contextMock,
+                context,
                 accountUid,
                 fileBuffer,
                 fileName,
@@ -315,15 +335,13 @@ describe("executeFileMt", () => {
     });
 
     test("translation fails with CANCELED state", async () => {
-        fileTranslationsApiMock.getTranslationProgress = jest.fn().mockResolvedValue({
-            state: MTState.CANCELED,
-            requestedStringCount: 0,
-            localeProcessStatuses: []
+        mockSmartlingRequest({
+            translateStatus: { state: "CANCELED" }
         });
 
         await expect(
             executeFileMt(
-                contextMock,
+                context,
                 accountUid,
                 fileBuffer,
                 fileName,
@@ -335,17 +353,16 @@ describe("executeFileMt", () => {
     });
 
     test("language detection failure throws error", async () => {
-        fileTranslationsApiMock.detectFileLanguage = jest.fn().mockResolvedValue({
-            languageDetectionUid: "lang-det-uid"
-        });
-        fileTranslationsApiMock.getLanguageDetectionProgress = jest.fn().mockResolvedValue({
-            state: LanguageDetectionState.FAILED,
-            detectedSourceLanguages: []
+        mockSmartlingRequest({
+            langDetectStatus: {
+                state: "FAILED",
+                detectedSourceLanguages: []
+            }
         });
 
         await expect(
             executeFileMt(
-                contextMock,
+                context,
                 accountUid,
                 fileBuffer,
                 fileName,
@@ -356,18 +373,17 @@ describe("executeFileMt", () => {
         ).rejects.toThrow("Language detection failed.");
     });
 
-    test("language detection returns empty languages list", async () => {
-        fileTranslationsApiMock.detectFileLanguage = jest.fn().mockResolvedValue({
-            languageDetectionUid: "lang-det-uid"
-        });
-        fileTranslationsApiMock.getLanguageDetectionProgress = jest.fn().mockResolvedValue({
-            state: LanguageDetectionState.COMPLETED,
-            detectedSourceLanguages: []
+    test("language detection not completed immediately throws error", async () => {
+        mockSmartlingRequest({
+            langDetectStatus: {
+                state: "QUEUED",
+                detectedSourceLanguages: []
+            }
         });
 
         await expect(
             executeFileMt(
-                contextMock,
+                context,
                 accountUid,
                 fileBuffer,
                 fileName,
@@ -375,137 +391,73 @@ describe("executeFileMt", () => {
                 undefined,
                 ["fr-FR"]
             )
-        ).rejects.toThrow("Language detection API returned empty list of languages.");
+        ).rejects.toThrow("Language detection did not complete immediately. Please specify source locale manually.");
     });
 
-    test("logger calls throughout the flow", async () => {
-        fileTranslationsApiMock.detectFileLanguage = jest.fn().mockResolvedValue({
-            languageDetectionUid: "lang-det-uid"
-        });
-        fileTranslationsApiMock.getLanguageDetectionProgress = jest.fn().mockResolvedValue({
-            state: LanguageDetectionState.COMPLETED,
-            detectedSourceLanguages: [{ defaultLocaleId: "en-US" }]
+    test("error during upload propagates", async () => {
+        smartlingRequest.mockImplementation((_ctx: any, opts: any) => {
+            if (opts.path.endsWith("/files") && opts.method === "POST") {
+                return Promise.reject(new Error("Upload failed"));
+            }
+            return Promise.resolve({});
         });
 
-        await executeFileMt(
-            contextMock,
-            accountUid,
-            fileBuffer,
-            fileName,
-            undefined,
-            undefined,
-            ["fr-FR"],
-            300,
-            1
-        );
-
-        expect(contextMock.logger.info).toHaveBeenCalledWith(
-            "File MT translation started.",
-            expect.objectContaining({ fileName, targetLocales: ["fr-FR"] })
-        );
-        expect(contextMock.logger.debug).toHaveBeenCalledWith(
-            "File uploading started.",
-            expect.objectContaining({ fileName })
-        );
-        expect(contextMock.logger.info).toHaveBeenCalledWith(
-            "File successfully uploaded.",
-            expect.objectContaining({ fileUid })
-        );
-        expect(contextMock.logger.debug).toHaveBeenCalledWith(
-            "Starting language detection.",
-            expect.objectContaining({ fileUid })
-        );
-        expect(contextMock.logger.info).toHaveBeenCalledWith(
-            "Language detected.",
-            expect.objectContaining({ sourceLocaleId: "en-US" })
-        );
-        expect(contextMock.logger.debug).toHaveBeenCalledWith(
-            "Starting file translation.",
-            expect.objectContaining({ fileUid })
-        );
-        expect(contextMock.logger.info).toHaveBeenCalledWith(
-            "File translation successfully started.",
-            expect.objectContaining({ fileUid, mtUid })
-        );
-        expect(contextMock.logger.debug).toHaveBeenCalledWith(
-            "Polling for translation progress.",
-            expect.objectContaining({ fileUid, mtUid })
-        );
-        expect(contextMock.logger.info).toHaveBeenCalledWith(
-            "Translation progress polling completed.",
-            expect.objectContaining({ fileUid, mtUid, state: MTState.COMPLETED })
-        );
+        await expect(
+            executeFileMt(
+                context,
+                accountUid,
+                fileBuffer,
+                fileName,
+                "html",
+                "en-US",
+                ["fr-FR"]
+            )
+        ).rejects.toThrow("Upload failed");
     });
 
-    test("uses default fileName when response has no fileName", async () => {
-        fileTranslationsApiMock.downloadTranslatedFileWithMetadata = jest.fn().mockResolvedValue({
-            fileContent: "translated content",
-            contentType: "text/plain"
+    test("uses default fileName when content-disposition has no filename", async () => {
+        mockSmartlingRequest({
+            download: {
+                body: Buffer.from("translated content"),
+                headers: {
+                    "content-type": "text/plain"
+                }
+            }
         });
 
         const result = await executeFileMt(
-            contextMock,
+            context,
             accountUid,
             fileBuffer,
             fileName,
             "html",
             "en-US",
-            ["fr-FR"],
-            300,
-            1
+            ["fr-FR"]
         );
 
         expect(result.fileName).toBe("translation");
     });
 
-    test("uses default contentType when response has no contentType", async () => {
-        fileTranslationsApiMock.downloadTranslatedFileWithMetadata = jest.fn().mockResolvedValue({
-            fileName: "test.txt",
-            fileContent: "translated content"
+    test("uses default contentType when response has no content-type", async () => {
+        mockSmartlingRequest({
+            download: {
+                body: Buffer.from("translated content"),
+                headers: {
+                    "content-disposition": 'attachment; filename="test.txt"'
+                }
+            }
         });
 
         const result = await executeFileMt(
-            contextMock,
+            context,
             accountUid,
             fileBuffer,
             fileName,
             "html",
             "en-US",
-            ["fr-FR"],
-            300,
-            1
+            ["fr-FR"]
         );
 
         expect(result.contentType).toBe("application/octet-stream");
-    });
-
-    test("language detection polls when queued", async () => {
-        fileTranslationsApiMock.detectFileLanguage = jest.fn().mockResolvedValue({
-            languageDetectionUid: "lang-det-uid"
-        });
-        fileTranslationsApiMock.getLanguageDetectionProgress = jest.fn()
-            .mockResolvedValueOnce({
-                state: LanguageDetectionState.QUEUED,
-                detectedSourceLanguages: []
-            })
-            .mockResolvedValueOnce({
-                state: LanguageDetectionState.COMPLETED,
-                detectedSourceLanguages: [{ defaultLocaleId: "en-US" }]
-            });
-
-        const result = await executeFileMt(
-            contextMock,
-            accountUid,
-            fileBuffer,
-            fileName,
-            "html",
-            undefined,
-            ["fr-FR"],
-            300,
-            1
-        );
-
-        expect(fileTranslationsApiMock.getLanguageDetectionProgress).toHaveBeenCalledTimes(2);
-        expect(result.content).toEqual(Buffer.from("translated content"));
     });
 });
