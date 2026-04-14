@@ -1,58 +1,46 @@
-import path from "path";
-import {
-    DownloadFileWithMetadataParameters,
-    FileNameMode,
-    RetrievalType
-} from "smartling-api-sdk-nodejs";
-import { Context } from "../../common/context";
+import { smartlingRequest } from "../../common/smartling-api";
+import { parseFileName } from "../../common/file-utils";
+
+export interface DownloadResult {
+    content: Buffer;
+    fileName: string;
+    contentType: string;
+}
 
 export const executeDownloadTranslatedFile = async (
-    ctx: Context,
+    context: any,
     projectUid: string,
     fileUri: string,
     targetLocale: string,
-    retrievalType?: string,
-    includeOriginalStrings?: boolean
-): Promise<{ content: Buffer; fileName: string; contentType: string }> => {
-    const parameters = new DownloadFileWithMetadataParameters();
-    parameters.setFileNameMode(FileNameMode.TRANSFORMED);
-
+    retrievalType: string | undefined,
+    includeOriginalStrings: boolean
+): Promise<DownloadResult> => {
+    const qs: Record<string, string> = {
+        fileUri,
+        fileNameMode: "TRANSFORMED",
+    };
     if (retrievalType) {
-        parameters.setRetrievalType(retrievalType as RetrievalType);
+        qs.retrievalType = retrievalType;
+    }
+    if (includeOriginalStrings) {
+        qs.includeOriginalStrings = "true";
     }
 
-    if (includeOriginalStrings === true) {
-        parameters.includeOriginalStrings();
-    } else if (includeOriginalStrings === false) {
-        parameters.excludeOriginalStrings();
-    }
-
-    ctx.logger.info("Downloading translated file.", {
-        projectUid,
-        fileUri,
-        targetLocale,
-        retrievalType,
-        includeOriginalStrings
+    const response = await smartlingRequest(context, {
+        method: "GET",
+        path: `/files-api/v2/projects/${projectUid}/locales/${targetLocale}/file`,
+        qs,
+        encoding: "arraybuffer",
+        returnFullResponse: true,
     });
 
-    const filesApi = ctx.getFilesApi();
-    const translatedFile = await filesApi.downloadFileWithMetadata(
-        projectUid, fileUri, targetLocale, parameters
-    );
-
-    const fullFileName = translatedFile.fileName ?? fileUri;
-    const parsedFileName = path.parse(fullFileName);
-
-    ctx.logger.info("Download translated file completed successfully.", {
-        projectUid,
-        fileUri,
-        targetLocale,
-        fileName: fullFileName
-    });
+    const contentDisposition = (response.headers?.["content-disposition"] ?? "") as string;
+    const fileNameMatch = contentDisposition.match(/filename="?([^";\n]+)"?/);
+    const parsed = parseFileName(fileNameMatch?.[1] ?? fileUri);
 
     return {
-        content: Buffer.from(translatedFile.fileContent),
-        fileName: parsedFileName.base || fullFileName,
-        contentType: translatedFile.contentType ?? "application/octet-stream"
+        content: Buffer.from(response.body as ArrayBuffer),
+        fileName: parsed.base,
+        contentType: (response.headers?.["content-type"] ?? "application/octet-stream") as string,
     };
 };

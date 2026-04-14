@@ -1,170 +1,155 @@
-import {
-    DownloadFileWithMetadataParameters,
-    FileNameMode,
-    RetrievalType,
-    SmartlingFilesApi
-} from "smartling-api-sdk-nodejs";
-import { createContextMock } from "../../../../test/mocks";
-import { Context } from "../../common/context";
 import { executeDownloadTranslatedFile } from "./execute";
 
+const mockSmartlingRequest = jest.fn();
+jest.mock("../../common/smartling-api", () => ({
+    smartlingRequest: (...args: any[]) => mockSmartlingRequest(...args),
+}));
+
 describe("executeDownloadTranslatedFile", () => {
-    let contextMock: Context;
-    let filesApiMock: ReturnType<Context["getFilesApi"]>;
-
-    const createExpectedParameters = (options: {
-        retrievalType?: RetrievalType;
-        includeOriginalStrings?: boolean;
-    } = {}) => {
-        const params = new DownloadFileWithMetadataParameters();
-        params.setFileNameMode(FileNameMode.TRANSFORMED);
-
-        if (options.retrievalType) {
-            params.setRetrievalType(options.retrievalType);
-        }
-
-        if (options.includeOriginalStrings === true) {
-            params.includeOriginalStrings();
-        } else if (options.includeOriginalStrings === false) {
-            params.excludeOriginalStrings();
-        }
-
-        return params;
-    };
+    const mockContext = {};
 
     beforeEach(() => {
         jest.clearAllMocks();
-        contextMock = createContextMock();
-        filesApiMock = contextMock.getFilesApi() as jest.Mocked<SmartlingFilesApi>;
     });
 
     test("downloads file with minimal parameters", async () => {
-        const mockResponse = {
-            fileContent: Buffer.from("translated file content"),
-            fileName: "files/test-file.json",
-            contentType: "application/json"
-        };
-        (filesApiMock.downloadFileWithMetadata as jest.Mock).mockResolvedValue(mockResponse);
+        mockSmartlingRequest.mockResolvedValue({
+            body: Buffer.from("translated file content"),
+            headers: {
+                "content-disposition": 'attachment; filename="test-file.json"',
+                "content-type": "application/json",
+            },
+            statusCode: 200,
+        });
 
         const result = await executeDownloadTranslatedFile(
-            contextMock,
-            "test-project-123",
-            "files/test-file.json",
-            "es-ES"
-        );
-
-        const expectedParams = createExpectedParameters();
-        expect(filesApiMock.downloadFileWithMetadata).toHaveBeenCalledWith(
+            mockContext,
             "test-project-123",
             "files/test-file.json",
             "es-ES",
-            expectedParams
+            undefined,
+            false
         );
+
+        expect(mockSmartlingRequest).toHaveBeenCalledWith(mockContext, {
+            method: "GET",
+            path: "/files-api/v2/projects/test-project-123/locales/es-ES/file",
+            qs: {
+                fileUri: "files/test-file.json",
+                fileNameMode: "TRANSFORMED",
+            },
+            encoding: "arraybuffer",
+            returnFullResponse: true,
+        });
         expect(result).toEqual({
             content: Buffer.from("translated file content"),
             fileName: "test-file.json",
-            contentType: "application/json"
+            contentType: "application/json",
         });
     });
 
     test("downloads file with all parameters", async () => {
-        const mockResponse = {
-            fileContent: Buffer.from("translated file content"),
-            fileName: "files/test-file.json",
-            contentType: "application/json"
-        };
-        (filesApiMock.downloadFileWithMetadata as jest.Mock).mockResolvedValue(mockResponse);
+        mockSmartlingRequest.mockResolvedValue({
+            body: Buffer.from("translated file content"),
+            headers: {
+                "content-disposition": 'attachment; filename="test-file.json"',
+                "content-type": "application/json",
+            },
+            statusCode: 200,
+        });
 
         const result = await executeDownloadTranslatedFile(
-            contextMock,
+            mockContext,
             "test-project-123",
             "files/test-file.json",
             "es-ES",
-            RetrievalType.PENDING,
+            "PENDING",
             true
         );
 
-        const expectedParams = createExpectedParameters({
-            retrievalType: RetrievalType.PENDING,
-            includeOriginalStrings: true
+        expect(mockSmartlingRequest).toHaveBeenCalledWith(mockContext, {
+            method: "GET",
+            path: "/files-api/v2/projects/test-project-123/locales/es-ES/file",
+            qs: {
+                fileUri: "files/test-file.json",
+                fileNameMode: "TRANSFORMED",
+                retrievalType: "PENDING",
+                includeOriginalStrings: "true",
+            },
+            encoding: "arraybuffer",
+            returnFullResponse: true,
         });
-        expect(filesApiMock.downloadFileWithMetadata).toHaveBeenCalledWith(
-            "test-project-123",
-            "files/test-file.json",
-            "es-ES",
-            expectedParams
-        );
         expect(result).toEqual({
             content: Buffer.from("translated file content"),
             fileName: "test-file.json",
-            contentType: "application/json"
+            contentType: "application/json",
         });
     });
 
     test("downloads file with published retrieval type", async () => {
-        const mockResponse = {
-            fileContent: Buffer.from("content"),
-            fileName: "file.xml",
-            contentType: "application/xml"
-        };
-        (filesApiMock.downloadFileWithMetadata as jest.Mock).mockResolvedValue(mockResponse);
+        mockSmartlingRequest.mockResolvedValue({
+            body: Buffer.from("content"),
+            headers: {
+                "content-disposition": 'attachment; filename="file.xml"',
+                "content-type": "application/xml",
+            },
+            statusCode: 200,
+        });
 
         await executeDownloadTranslatedFile(
-            contextMock,
+            mockContext,
             "proj-1",
             "file.xml",
             "fr-FR",
-            RetrievalType.PUBLISHED
+            "PUBLISHED",
+            false
         );
 
-        const expectedParams = createExpectedParameters({
-            retrievalType: RetrievalType.PUBLISHED
-        });
-        expect(filesApiMock.downloadFileWithMetadata).toHaveBeenCalledWith(
-            "proj-1",
-            "file.xml",
-            "fr-FR",
-            expectedParams
-        );
+        expect(mockSmartlingRequest).toHaveBeenCalledWith(mockContext, expect.objectContaining({
+            qs: expect.objectContaining({
+                retrievalType: "PUBLISHED",
+            }),
+        }));
     });
 
     test("downloads file with approved retrieval type", async () => {
-        const mockResponse = {
-            fileContent: Buffer.from("content"),
-            fileName: "file.xml",
-            contentType: "application/xml"
-        };
-        (filesApiMock.downloadFileWithMetadata as jest.Mock).mockResolvedValue(mockResponse);
+        mockSmartlingRequest.mockResolvedValue({
+            body: Buffer.from("content"),
+            headers: {
+                "content-disposition": 'attachment; filename="file.xml"',
+                "content-type": "application/xml",
+            },
+            statusCode: 200,
+        });
 
         await executeDownloadTranslatedFile(
-            contextMock,
+            mockContext,
             "proj-1",
             "file.xml",
             "de-DE",
-            "approved"
+            "approved",
+            false
         );
 
-        const expectedParams = createExpectedParameters({
-            retrievalType: "approved" as RetrievalType
-        });
-        expect(filesApiMock.downloadFileWithMetadata).toHaveBeenCalledWith(
-            "proj-1",
-            "file.xml",
-            "de-DE",
-            expectedParams
-        );
+        expect(mockSmartlingRequest).toHaveBeenCalledWith(mockContext, expect.objectContaining({
+            qs: expect.objectContaining({
+                retrievalType: "approved",
+            }),
+        }));
     });
 
     test("downloads file with includeOriginalStrings set to false", async () => {
-        const mockResponse = {
-            fileContent: Buffer.from("content"),
-            fileName: "file.json",
-            contentType: "application/json"
-        };
-        (filesApiMock.downloadFileWithMetadata as jest.Mock).mockResolvedValue(mockResponse);
+        mockSmartlingRequest.mockResolvedValue({
+            body: Buffer.from("content"),
+            headers: {
+                "content-disposition": 'attachment; filename="file.json"',
+                "content-type": "application/json",
+            },
+            statusCode: 200,
+        });
 
         await executeDownloadTranslatedFile(
-            contextMock,
+            mockContext,
             "proj-1",
             "file.json",
             "ja-JP",
@@ -172,48 +157,74 @@ describe("executeDownloadTranslatedFile", () => {
             false
         );
 
-        const expectedParams = createExpectedParameters({
-            includeOriginalStrings: false
-        });
-        expect(filesApiMock.downloadFileWithMetadata).toHaveBeenCalledWith(
-            "proj-1",
-            "file.json",
-            "ja-JP",
-            expectedParams
-        );
+        // includeOriginalStrings is false, so it should NOT be in qs
+        expect(mockSmartlingRequest).toHaveBeenCalledWith(mockContext, expect.objectContaining({
+            qs: expect.not.objectContaining({
+                includeOriginalStrings: expect.anything(),
+            }),
+        }));
     });
 
-    test("extracts filename from complex file URI", async () => {
-        const mockResponse = {
-            fileContent: Buffer.from("content"),
-            fileName: "path/to/deeply/nested/my-document.xml",
-            contentType: "application/xml"
-        };
-        (filesApiMock.downloadFileWithMetadata as jest.Mock).mockResolvedValue(mockResponse);
+    test("extracts filename from complex file URI via content-disposition", async () => {
+        mockSmartlingRequest.mockResolvedValue({
+            body: Buffer.from("content"),
+            headers: {
+                "content-disposition": 'attachment; filename="my-document.xml"',
+                "content-type": "application/xml",
+            },
+            statusCode: 200,
+        });
 
         const result = await executeDownloadTranslatedFile(
-            contextMock,
+            mockContext,
             "proj-1",
             "path/to/deeply/nested/my-document.xml",
-            "es-ES"
+            "es-ES",
+            undefined,
+            false
         );
 
         expect(result.fileName).toBe("my-document.xml");
     });
 
-    test("falls back to fileUri when fileName is not in response", async () => {
-        const mockResponse = {
-            fileContent: Buffer.from("content"),
-            fileName: undefined,
-            contentType: "text/plain"
-        };
-        (filesApiMock.downloadFileWithMetadata as jest.Mock).mockResolvedValue(mockResponse);
+    test("falls back to fileUri when content-disposition header is absent", async () => {
+        mockSmartlingRequest.mockResolvedValue({
+            body: Buffer.from("content"),
+            headers: {
+                "content-type": "text/plain",
+            },
+            statusCode: 200,
+        });
 
         const result = await executeDownloadTranslatedFile(
-            contextMock,
+            mockContext,
             "proj-1",
             "simple-file.txt",
-            "es-ES"
+            "es-ES",
+            undefined,
+            false
+        );
+
+        expect(result.fileName).toBe("simple-file.txt");
+    });
+
+    test("falls back to fileUri basename when content-disposition has no filename", async () => {
+        mockSmartlingRequest.mockResolvedValue({
+            body: Buffer.from("content"),
+            headers: {
+                "content-disposition": "attachment",
+                "content-type": "text/plain",
+            },
+            statusCode: 200,
+        });
+
+        const result = await executeDownloadTranslatedFile(
+            mockContext,
+            "proj-1",
+            "path/to/simple-file.txt",
+            "es-ES",
+            undefined,
+            false
         );
 
         expect(result.fileName).toBe("simple-file.txt");
@@ -221,52 +232,36 @@ describe("executeDownloadTranslatedFile", () => {
 
     test("handles API error", async () => {
         const apiError = new Error("File not found");
-        (filesApiMock.downloadFileWithMetadata as jest.Mock).mockRejectedValue(apiError);
+        mockSmartlingRequest.mockRejectedValue(apiError);
 
         await expect(
             executeDownloadTranslatedFile(
-                contextMock,
+                mockContext,
                 "proj-1",
                 "missing-file.json",
-                "es-ES"
+                "es-ES",
+                undefined,
+                false
             )
         ).rejects.toThrow("File not found");
     });
 
-    test("logs download start and completion", async () => {
-        const mockResponse = {
-            fileContent: Buffer.from("content"),
-            fileName: "file.json",
-            contentType: "application/json"
-        };
-        (filesApiMock.downloadFileWithMetadata as jest.Mock).mockResolvedValue(mockResponse);
+    test("uses application/octet-stream as default content-type when header is missing", async () => {
+        mockSmartlingRequest.mockResolvedValue({
+            body: Buffer.from("content"),
+            headers: {},
+            statusCode: 200,
+        });
 
-        await executeDownloadTranslatedFile(
-            contextMock,
+        const result = await executeDownloadTranslatedFile(
+            mockContext,
             "proj-1",
-            "file.json",
+            "file.bin",
             "es-ES",
-            RetrievalType.PENDING,
-            true
+            undefined,
+            false
         );
 
-        expect(contextMock.logger.info).toHaveBeenCalledWith(
-            "Downloading translated file.",
-            expect.objectContaining({
-                projectUid: "proj-1",
-                fileUri: "file.json",
-                targetLocale: "es-ES",
-                retrievalType: RetrievalType.PENDING,
-                includeOriginalStrings: true
-            })
-        );
-        expect(contextMock.logger.info).toHaveBeenCalledWith(
-            "Download translated file completed successfully.",
-            expect.objectContaining({
-                projectUid: "proj-1",
-                fileUri: "file.json",
-                targetLocale: "es-ES"
-            })
-        );
+        expect(result.contentType).toBe("application/octet-stream");
     });
 });
