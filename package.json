@@ -7,7 +7,8 @@
     "n8n-community-node-package"
   ],
   "author": {
-    "name": "Smartling"
+    "name": "Smartling",
+    "email": "n8n@smartling.com"
   },
   "repository": {
     "type": "git",
